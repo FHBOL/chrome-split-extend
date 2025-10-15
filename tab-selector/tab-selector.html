@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>选择要分屏的网站</title>
+  <link rel="stylesheet" href="tab-selector.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🌐 选择要分屏显示的网站</h1>
+      <p class="subtitle">从已打开的标签页中选择，最多支持4个网站同时显示</p>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn btn-secondary" id="refreshBtn">🔄 刷新列表</button>
+      <button class="btn btn-secondary" id="selectAllBtn">✅ 全选</button>
+      <button class="btn btn-secondary" id="clearAllBtn">❌ 清除</button>
+      <span class="selected-count">已选择: <strong id="selectedCount">0</strong> / 4</span>
+    </div>
+
+    <div class="tabs-grid" id="tabsGrid">
+      <p class="loading">正在获取标签页...</p>
+    </div>
+
+    <div class="empty-state" id="emptyState" style="display: none;">
+      <div class="empty-icon">📭</div>
+      <h3>没有找到可用的标签页</h3>
+      <p>请先打开一些网站，然后点击刷新</p>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-large btn-success" id="startSplitView" disabled>
+        🚀 开始分屏 (<span id="actionCount">0</span>)
+      </button>
+    </div>
+
+    <div class="tips">
+      <h3>💡 使用提示</h3>
+      <ul>
+        <li>选择你想要同时查看的网站（AI聊天、文档、工具等）</li>
+        <li>建议选择2-4个网站以获得最佳体验</li>
+        <li>分屏后可以使用统一输入框同时向所有AI发送消息（需先配置选择器）</li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="tab-selector.js"></script>
+</body>
+</html>
+

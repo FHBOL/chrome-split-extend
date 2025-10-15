@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多AI对话聚合器</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 多AI对话聚合器</h1>
+    
+    <div class="section">
+      <h2>快捷操作</h2>
+      <button id="openTabSelector" class="btn btn-primary">
+        🌐 从标签页选择并分屏 (推荐) ✨
+      </button>
+      <button id="openSelectorConfig" class="btn btn-secondary">
+        🎯 配置AI选择器
+      </button>
+      <button id="openWindowManager" class="btn btn-secondary">
+        🖥️ 窗口管理器 (旧版)
+      </button>
+    </div>
+
+    <div class="section">
+      <h2>启用的AI网站</h2>
+      <div id="aiList" class="ai-list">
+        <p class="loading">加载中...</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>说明</h2>
+      <p style="font-size: 12px; color: #666; line-height: 1.6;">
+        <strong>🌐 从标签页选择并分屏</strong>：从已打开的标签页中选择任意网站，在一个页面内分屏显示，支持统一输入！✨ 推荐<br>
+        <strong>🎯 配置AI选择器</strong>：为AI网站配置输入框和发送按钮的选择器，实现统一发送功能<br>
+        <strong>🖥️ 窗口管理器</strong>：使用窗口排列方式，备选方案
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>快速发送</h2>
+      <textarea id="quickInput" placeholder="在这里输入问题，然后点击发送..." rows="3"></textarea>
+      <button id="quickSend" class="btn btn-success">
+        ⚡ 发送到所有AI
+      </button>
+      <p id="status" class="status"></p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+

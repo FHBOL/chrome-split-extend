@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>窗口管理器 - 多AI对话聚合器</title>
+  <link rel="stylesheet" href="window-manager.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🖥️ 窗口分屏管理器</h1>
+      <p class="subtitle">从当前标签页选择网站，自动分屏排列</p>
+    </div>
+
+    <!-- 标签页选择区 -->
+    <div class="section">
+      <div class="section-header">
+        <h2>📑 选择要分屏的标签页</h2>
+        <button id="refreshTabs" class="btn-text">🔄 刷新</button>
+      </div>
+      <div id="tabsList" class="tabs-list">
+        <div class="loading">正在加载标签页...</div>
+      </div>
+    </div>
+
+    <!-- 布局选择 -->
+    <div class="section">
+      <h2>🎨 选择分屏布局</h2>
+      <div class="layout-options">
+        <div class="layout-option" data-layout="2-vertical">
+          <div class="layout-preview">
+            <div class="preview-box" style="width: 100%; height: 48%;"></div>
+            <div class="preview-box" style="width: 100%; height: 48%;"></div>
+          </div>
+          <input type="radio" name="layout" value="2-vertical" id="layout-2v">
+          <label for="layout-2v">上下分屏 (2个)</label>
+        </div>
+        
+        <div class="layout-option" data-layout="2-horizontal">
+          <div class="layout-preview">
+            <div class="preview-box" style="width: 48%; height: 100%;"></div>
+            <div class="preview-box" style="width: 48%; height: 100%;"></div>
+          </div>
+          <input type="radio" name="layout" value="2-horizontal" id="layout-2h" checked>
+          <label for="layout-2h">左右分屏 (2个)</label>
+        </div>
+        
+        <div class="layout-option" data-layout="3-horizontal">
+          <div class="layout-preview">
+            <div class="preview-box" style="width: 31%; height: 100%;"></div>
+            <div class="preview-box" style="width: 31%; height: 100%;"></div>
+            <div class="preview-box" style="width: 31%; height: 100%;"></div>
+          </div>
+          <input type="radio" name="layout" value="3-horizontal" id="layout-3h">
+          <label for="layout-3h">三列横向 (3个)</label>
+        </div>
+        
+        <div class="layout-option" data-layout="4-grid">
+          <div class="layout-preview">
+            <div class="preview-box" style="width: 48%; height: 48%;"></div>
+            <div class="preview-box" style="width: 48%; height: 48%;"></div>
+            <div class="preview-box" style="width: 48%; height: 48%;"></div>
+            <div class="preview-box" style="width: 48%; height: 48%;"></div>
+          </div>
+          <input type="radio" name="layout" value="4-grid" id="layout-4g">
+          <label for="layout-4g">四宫格 (4个)</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统一输入区 -->
+    <div class="section">
+      <h2>📝 统一输入（可选）</h2>
+      <textarea id="unifiedInput" placeholder="输入问题后，点击"应用分屏"会自动向所有窗口发送..." rows="3"></textarea>
+      <div class="input-hint">
+        提示：分屏后会自动向所有窗口注入统一输入框，支持一键发送
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="actions">
+      <button id="applySplit" class="btn btn-primary">
+        ✨ 应用分屏
+      </button>
+      <button id="restoreWindows" class="btn btn-secondary">
+        🔄 恢复窗口
+      </button>
+      <button id="saveLayout" class="btn btn-secondary">
+        💾 保存布局
+      </button>
+    </div>
+
+    <!-- 状态信息 -->
+    <div id="status" class="status hidden"></div>
+
+    <!-- 已保存的布局 -->
+    <div class="section">
+      <h2>💾 已保存的布局</h2>
+      <div id="savedLayouts" class="saved-layouts">
+        <p class="empty-hint">暂无保存的布局</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="window-manager.js"></script>
+</body>
+</html>
+

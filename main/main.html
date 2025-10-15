@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多AI对话聚合器 - 主控制面板</title>
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+  <div class="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1>🤖 AI管理</h1>
+        <button class="toggle-btn" id="toggleSidebar">◀</button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- AI网站列表 -->
+        <div class="section">
+          <h2>AI网站列表</h2>
+          <div id="aiSitesList" class="ai-sites-list">
+            <!-- 动态生成 -->
+          </div>
+        </div>
+
+        <!-- 添加自定义AI -->
+        <div class="section">
+          <h2>添加自定义AI</h2>
+          <form id="addAIForm" class="add-ai-form">
+            <input type="text" id="aiName" placeholder="名称 (如: DeepSeek)" required>
+            <input type="url" id="aiUrl" placeholder="URL (如: https://...)" required>
+            <input type="text" id="aiInputSelector" placeholder="输入框选择器 (如: textarea)" required>
+            <input type="text" id="aiSendSelector" placeholder="发送按钮选择器 (如: button.send)" required>
+            <button type="submit" class="btn btn-add">➕ 添加</button>
+          </form>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="section">
+          <button id="openAllAI" class="btn btn-primary">🚀 启动所有AI</button>
+          <button id="closeAllAI" class="btn btn-danger">❌ 关闭所有AI</button>
+          <button id="resetConfig" class="btn btn-secondary">🔄 重置配置</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <div class="header">
+        <h1>多AI对话聚合器</h1>
+        <div class="header-actions">
+          <button id="openSplitView" class="btn-icon" title="打开分屏视图" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #000; width: auto; padding: 8px 16px; font-size: 14px; border-radius: 6px;">🖥️ 分屏视图</button>
+          <span id="aiTabsStatus" class="status-badge">未启动</span>
+          <button id="refreshStatus" class="btn-icon" title="刷新状态">🔄</button>
+        </div>
+      </div>
+
+      <!-- 统一输入区 -->
+      <div class="input-section">
+        <div class="input-header">
+          <h2>📝 统一输入</h2>
+          <div class="input-actions">
+            <button id="clearInput" class="btn-text">清空</button>
+            <button id="copyInput" class="btn-text">复制</button>
+          </div>
+        </div>
+        <textarea 
+          id="unifiedInput" 
+          placeholder="在这里输入你的问题，点击发送后会同时发送到所有启用的AI网站..."
+          rows="6"
+        ></textarea>
+        <div class="input-footer">
+          <div class="char-count">
+            字符数: <span id="charCount">0</span>
+          </div>
+          <button id="sendToAll" class="btn btn-send">
+            ⚡ 发送到所有AI
+          </button>
+        </div>
+      </div>
+
+      <!-- AI预览卡片区 -->
+      <div class="preview-section">
+        <h2>📊 AI状态预览</h2>
+        <div id="aiPreviewCards" class="ai-preview-cards">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+
+      <!-- 消息日志 -->
+      <div class="log-section">
+        <div class="log-header">
+          <h2>📋 操作日志</h2>
+          <button id="clearLog" class="btn-text">清空</button>
+        </div>
+        <div id="messageLog" class="message-log">
+          <p class="log-empty">暂无日志</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
+

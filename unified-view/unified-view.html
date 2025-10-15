@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>统一视图 - 多AI对话聚合器</title>
+  <link rel="stylesheet" href="unified-view.css">
+</head>
+<body>
+  <!-- 顶部统一输入栏 -->
+  <div class="unified-input-bar">
+    <div class="logo">🤖 多AI对话聚合器</div>
+    <div class="input-container">
+      <textarea id="unifiedInput" placeholder="在这里输入问题，会同步到下方所有AI..." rows="1"></textarea>
+      <button id="sendToAll" class="send-btn">⚡ 发送到所有AI</button>
+    </div>
+    <div class="controls">
+      <button id="refreshAll" class="btn-icon" title="刷新所有">🔄</button>
+      <button id="settings" class="btn-icon" title="设置">⚙️</button>
+    </div>
+  </div>
+
+  <!-- AI网站容器 - 使用iframe尝试加载，失败则显示引导 -->
+  <div class="ai-container">
+    <!-- ChatGPT -->
+    <div class="ai-panel">
+      <div class="panel-header">
+        <span class="panel-title">💬 ChatGPT</span>
+        <div class="panel-actions">
+          <button class="btn-open" data-url="https://chatgpt.com/">打开</button>
+          <button class="btn-popup" data-url="https://chatgpt.com/">新窗口</button>
+        </div>
+      </div>
+      <div class="panel-content">
+        <iframe src="https://chatgpt.com/" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        <div class="panel-overlay">
+          <div class="overlay-content">
+            <div class="overlay-icon">🔒</div>
+            <h3>ChatGPT 无法直接嵌入</h3>
+            <p>由于安全策略限制，请在新窗口中使用</p>
+            <button class="btn-open-large" onclick="window.open('https://chatgpt.com/')">
+              🚀 在新窗口打开 ChatGPT
+            </button>
+            <div class="hint">
+              提示：打开后，使用顶部的统一输入框可以同步发送问题到所有已打开的AI窗口
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gemini -->
+    <div class="ai-panel">
+      <div class="panel-header">
+        <span class="panel-title">🌟 Gemini</span>
+        <div class="panel-actions">
+          <button class="btn-open" data-url="https://gemini.google.com/">打开</button>
+          <button class="btn-popup" data-url="https://gemini.google.com/">新窗口</button>
+        </div>
+      </div>
+      <div class="panel-content">
+        <iframe src="https://gemini.google.com/" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        <div class="panel-overlay">
+          <div class="overlay-content">
+            <div class="overlay-icon">🔒</div>
+            <h3>Gemini 无法直接嵌入</h3>
+            <p>由于安全策略限制，请在新窗口中使用</p>
+            <button class="btn-open-large" onclick="window.open('https://gemini.google.com/')">
+              🚀 在新窗口打开 Gemini
+            </button>
+            <div class="hint">
+              提示：打开后，使用顶部的统一输入框可以同步发送问题到所有已打开的AI窗口
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Claude -->
+    <div class="ai-panel">
+      <div class="panel-header">
+        <span class="panel-title">🧠 Claude</span>
+        <div class="panel-actions">
+          <button class="btn-open" data-url="https://claude.ai/">打开</button>
+          <button class="btn-popup" data-url="https://claude.ai/">新窗口</button>
+        </div>
+      </div>
+      <div class="panel-content">
+        <iframe src="https://claude.ai/" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        <div class="panel-overlay">
+          <div class="overlay-content">
+            <div class="overlay-icon">🔒</div>
+            <h3>Claude 无法直接嵌入</h3>
+            <p>由于安全策略限制，请在新窗口中使用</p>
+            <button class="btn-open-large" onclick="window.open('https://claude.ai/')">
+              🚀 在新窗口打开 Claude
+            </button>
+            <div class="hint">
+              提示：打开后，使用顶部的统一输入框可以同步发送问题到所有已打开的AI窗口
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 说明面板 -->
+  <div class="info-panel">
+    <h3>💡 如何使用</h3>
+    <ol>
+      <li>点击上方每个AI面板的"🚀 在新窗口打开"按钮</li>
+      <li>在打开的窗口中登录各个AI网站</li>
+      <li>回到这个页面，在顶部输入框输入问题</li>
+      <li>点击"⚡ 发送到所有AI"，问题会自动发送到所有已打开的AI窗口</li>
+      <li>切换窗口查看各个AI的回答（或使用窗口管理器分屏排列）</li>
+    </ol>
+    <p class="tech-note">
+      <strong>技术说明</strong>：由于所有主流AI网站都设置了X-Frame-Options安全策略，
+      无法在iframe中加载。这是浏览器的安全限制，任何Chrome扩展都无法绕过。
+      因此我们采用"统一控制中心 + 独立窗口"的方式实现功能。
+    </p>
+    <button id="openWindowManager" class="btn-recommend">
+      🖥️ 使用窗口管理器实现真正的分屏
+    </button>
+  </div>
+
+  <script src="unified-view.js"></script>
+</body>
+</html>
+

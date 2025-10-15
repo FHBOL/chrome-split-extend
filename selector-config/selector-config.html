@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI网站配置向导</title>
+  <link rel="stylesheet" href="selector-config.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 AI网站配置向导</h1>
+      <p class="subtitle">简单3步，让所有AI支持统一发送</p>
+    </div>
+
+    <!-- 步骤指示器 -->
+    <div class="steps">
+      <div class="step active" data-step="1">
+        <div class="step-number">1</div>
+        <div class="step-title">选择AI网站</div>
+      </div>
+      <div class="step" data-step="2">
+        <div class="step-number">2</div>
+        <div class="step-title">标记元素</div>
+      </div>
+      <div class="step" data-step="3">
+        <div class="step-number">3</div>
+        <div class="step-title">测试保存</div>
+      </div>
+    </div>
+
+    <!-- 步骤1: 选择AI网站 -->
+    <div class="step-content" id="step1">
+      <div class="step-header">
+        <h2>从已打开的标签页中选择AI网站</h2>
+        <button class="btn btn-secondary btn-small" id="refreshTabsBtn">🔄 刷新列表</button>
+      </div>
+      <p class="hint-text">💡 提示：请先打开你要配置的AI网站（如ChatGPT、Gemini等），然后在下方列表中选择</p>
+      <div class="ai-list" id="aiList">
+        <!-- 动态生成 -->
+      </div>
+      <button class="btn btn-primary" id="nextToStep2">下一步：标记元素</button>
+    </div>
+
+    <!-- 步骤2: 标记元素 -->
+    <div class="step-content hidden" id="step2">
+      <h2>在AI网站上标记元素</h2>
+      <div class="current-site-info">
+        <h3 id="currentSiteName">ChatGPT</h3>
+        <p id="currentSiteUrl">https://chatgpt.com/</p>
+      </div>
+
+      <div class="instruction-card">
+        <div class="instruction-step">
+          <div class="step-badge">步骤 1</div>
+          <div class="step-content-text">
+            <h4>点击下方"打开AI网站并开始标记"按钮</h4>
+            <p>会在新标签页打开AI网站</p>
+          </div>
+        </div>
+
+        <div class="instruction-step">
+          <div class="step-badge">步骤 2</div>
+          <div class="step-content-text">
+            <h4>在AI网站上，点击"开始选择输入框"</h4>
+            <p>鼠标会变成十字准星，移动到<strong>输入框</strong>上点击</p>
+          </div>
+        </div>
+
+        <div class="instruction-step">
+          <div class="step-badge">步骤 3</div>
+          <div class="step-content-text">
+            <h4>点击"选择发送按钮"</h4>
+            <p>移动到<strong>发送按钮</strong>上点击</p>
+          </div>
+        </div>
+
+        <div class="instruction-step">
+          <div class="step-badge">步骤 4</div>
+          <div class="step-content-text">
+            <h4>点击"保存配置"</h4>
+            <p>配置会自动保存，以后就不需要重新设置了</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-card">
+        <h4>📋 当前配置预览</h4>
+        <div class="config-item">
+          <label>输入框选择器:</label>
+          <code id="previewInput">未选择</code>
+        </div>
+        <div class="config-item">
+          <label>发送按钮选择器:</label>
+          <code id="previewSend">未选择</code>
+        </div>
+        <div class="config-status" id="configStatus">
+          ⏳ 等待配置...
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn btn-secondary" id="backToStep1">返回</button>
+        <button class="btn btn-primary btn-large" id="openAndMark">
+          🚀 打开AI网站并开始标记
+        </button>
+        <button class="btn btn-success" id="nextToStep3" disabled>
+          下一步：测试保存
+        </button>
+      </div>
+    </div>
+
+    <!-- 步骤3: 测试保存 -->
+    <div class="step-content hidden" id="step3">
+      <h2>测试配置</h2>
+      
+      <div class="test-card">
+        <h3>🧪 测试统一发送</h3>
+        <p>在下方输入框输入测试消息，点击"测试发送"，查看是否能正确发送到AI</p>
+        <div class="test-input-group">
+          <textarea id="testInput" placeholder="输入测试消息，例如：你好" rows="2"></textarea>
+          <button class="btn btn-primary" id="testSend">🧪 测试发送</button>
+        </div>
+        <div class="test-result" id="testResult"></div>
+      </div>
+
+      <div class="success-card">
+        <div class="success-icon">✅</div>
+        <h3>配置成功！</h3>
+        <p>该AI网站已配置完成，下次使用分屏视图时会自动应用此配置</p>
+        
+        <div class="next-actions">
+          <button class="btn btn-secondary" id="configAnother">
+            配置另一个AI网站
+          </button>
+          <button class="btn btn-success" id="finishConfig">
+            完成配置，开始使用
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 配置列表 -->
+    <div class="configured-list">
+      <h3>📝 已配置的AI网站</h3>
+      <div id="configuredAIs" class="configured-items">
+        <!-- 动态生成 -->
+      </div>
+    </div>
+  </div>
+
+  <script src="selector-config.js"></script>
+</body>
+</html>
+

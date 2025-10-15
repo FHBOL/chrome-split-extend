@@ -1,0 +1,315 @@
+# 多AI对话聚合器 - 开发规则和经验总结
+
+## 项目概述
+Chrome浏览器扩展，允许用户从已打开的标签页中选择网站进行分屏显示，并支持统一输入功能。
+
+## 核心架构
+
+### 1. 主要组件
+- **tab-selector**: 从已打开标签页选择要分屏的网站
+- **split-view**: 使用iframe在一个标签页内分屏显示多个网站
+- **selector-config**: 可视化配置AI网站的输入框和发送按钮选择器
+- **window-manager**: 备用方案，使用窗口API排列
+- **element-picker**: 注入到目标网站的元素选择工具
+
+### 2. 关键技术
+- **declarativeNetRequest API**: 移除X-Frame-Options限制，实现iframe嵌入
+- **postMessage**: 跨iframe通信，实现统一发送
+- **chrome.storage.local/sync**: 数据持久化
+- **chrome.tabs API**: 获取和管理标签页
+- **Content Scripts**: 操作网页DOM
+
+## 重要设计决策
+
+### 1. 完全移除硬编码
+❌ **错误做法**：预设AI网站列表
+```javascript
+const DEFAULT_AI_SITES = [
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/' },
+  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/' }
+];
+```
+
+✅ **正确做法**：从标签页动态获取
+```javascript
+const tabs = await chrome.tabs.query({});
+const validTabs = tabs.filter(tab => 
+  tab.url && tab.url.startsWith('http') && 
+  !tab.url.includes('chrome://')
+);
+```
+
+### 2. 数据传递机制
+**tab-selector → split-view**:
+```javascript
+// tab-selector保存临时数据
+await chrome.storage.local.set({ 
+  selectedSitesForSplit: sites,
+  splitViewTimestamp: Date.now()
+});
+
+// split-view读取（5秒内有效）
+if (localResult.selectedSitesForSplit && 
+    Date.now() - localResult.splitViewTimestamp < 5000) {
+  aiSites = localResult.selectedSitesForSplit;
+}
+```
+
+### 3. 跨iframe通信
+**父页面发送**:
+```javascript
+iframe.contentWindow.postMessage({
+  action: 'fillAndSend',
+  text: text,
+  source: 'ai-aggregator'
+}, '*');
+```
+
+**iframe内部接收** (iframe-injector.js):
+```javascript
+window.addEventListener('message', (event) => {
+  if (event.data.action === 'fillAndSend' && 
+      event.data.source === 'ai-aggregator') {
+    fillInput(element, event.data.text);
+    clickSendButton();
+  }
+});
+```
+
+### 4. 事件阻止策略
+**选择元素时防止误触发**:
+```javascript
+function handleClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation(); // 关键！阻止同元素的其他监听器
+}
+
+// 必须监听所有鼠标事件
+document.addEventListener('mousedown', handleMouseDown, true); // capture阶段
+document.addEventListener('mouseup', handleMouseUp, true);
+document.addEventListener('click', handleClick, true);
+```
+
+## 常见问题和解决方案
+
+### 问题1: iframe无法加载网站
+**原因**: X-Frame-Options和CSP限制
+**解决**: 使用declarativeNetRequest API
+```json
+// rules.json
+{
+  "action": {
+    "type": "modifyHeaders",
+    "responseHeaders": [
+      { "header": "x-frame-options", "operation": "remove" },
+      { "header": "content-security-policy", "operation": "remove" }
+    ]
+  },
+  "condition": {
+    "resourceTypes": ["sub_frame"]
+  }
+}
+```
+
+### 问题2: 无法向AI输入框填充内容
+**原因**: 
+1. 网站使用contentEditable而非textarea
+2. 网站监听特定事件（不只是input）
+3. 反爬虫机制检测isTrusted
+
+**解决**: 多种方法组合
+```javascript
+// 1. 先聚焦
+element.focus();
+element.click();
+
+// 2. 多种填充方式
+element.value = text; // textarea
+element.textContent = text; // contentEditable
+element.innerHTML = text;
+
+// 3. 触发多种事件
+element.dispatchEvent(new Event('input', { bubbles: true }));
+element.dispatchEvent(new InputEvent('input', { inputType: 'insertText' }));
+element.dispatchEvent(new Event('keyup', { bubbles: true }));
+```
+
+### 问题3: 选择发送按钮时误触发发送
+**原因**: 网站监听mousedown/mouseup而非click
+**解决**: 在捕获阶段阻止所有鼠标事件
+```javascript
+document.addEventListener('mousedown', handleMouseDown, true);
+document.addEventListener('mouseup', handleMouseUp, true);
+document.addEventListener('click', handleClick, true);
+```
+
+### 问题4: Gemini等网站使用Quill编辑器无法输入
+**原因**: Quill编辑器有自己的事件系统
+**解决**: 尝试直接操作Quill实例
+```javascript
+const quillContainer = element.closest('.ql-container');
+if (quillContainer && quillContainer.__quill) {
+  quillContainer.__quill.setText(text);
+}
+```
+
+### 问题5: split-view显示空白
+**原因**: 没有数据源（删除硬编码后）
+**解决**: 显示引导界面
+```javascript
+if (aiSites.length === 0) {
+  showEmptyGuide(); // 引导用户使用tab-selector
+  return;
+}
+```
+
+## 开发最佳实践
+
+### 1. 调试策略
+```javascript
+// 添加详细的console.log
+console.log('tab-selector: 准备保存的网站数据:', sites);
+console.log('split-view: 时间差:', timeDiff, 'ms');
+
+// 在关键路径上检查
+if (!element) {
+  console.error('未找到元素:', selector);
+  return;
+}
+```
+
+### 2. 用户体验优先
+- ✅ 空状态时显示引导而非空白
+- ✅ 操作失败时给出明确提示
+- ✅ 提供"刷新"按钮而非要求用户手动刷新
+- ✅ 显示实时计数和状态
+
+### 3. 数据存储
+```javascript
+// 临时数据用local（带时间戳）
+chrome.storage.local.set({ 
+  data: value,
+  timestamp: Date.now()
+});
+
+// 持久配置用sync
+chrome.storage.sync.set({ 
+  aiSites: sites
+});
+```
+
+### 4. 错误处理
+```javascript
+try {
+  await someOperation();
+} catch (error) {
+  console.error('操作失败:', error);
+  showNotification('操作失败: ' + error.message, 'error');
+}
+```
+
+## 功能清单
+
+### ✅ 已实现
+1. 从标签页动态选择网站（无硬编码）
+2. 在一个标签页内分屏显示（使用iframe + declarativeNetRequest）
+3. 统一输入框向所有AI发送消息（postMessage + content script）
+4. 可视化配置选择器（element-picker）
+5. 多种布局支持（2列、3列、4宫格等）
+6. 空状态引导
+7. 实时刷新标签页列表
+8. 配置持久化
+
+### 🚧 待优化
+1. 支持iframe大小调整
+2. 支持拖拽排序
+3. 历史对话记录对比
+4. 快捷键支持
+5. 导出对话功能
+6. 更智能的选择器自动识别
+7. 支持更多布局模式
+8. 性能优化（懒加载iframe）
+
+### ❌ 已废弃
+1. 硬编码的AI网站列表
+2. 自动填充测试文字（改为手动输入）
+3. 复杂的反爬虫对策（保持简单）
+
+## 文件组织
+
+```
+├── manifest.json           # 扩展配置
+├── rules.json             # declarativeNetRequest规则
+├── config.js              # 空的配置文件（向后兼容）
+├── background.js          # Service Worker
+├── popup/                 # 扩展弹出窗口
+├── tab-selector/          # 标签页选择器（主要入口）
+├── split-view/            # 分屏视图（iframe方式）
+├── selector-config/       # 选择器配置向导
+│   ├── element-picker.js  # 元素选择工具
+│   └── ...
+├── content-scripts/       # 内容脚本
+│   ├── injector.js        # 通用注入脚本
+│   └── iframe-injector.js # iframe内部注入
+└── window-manager/        # 窗口管理器（备用）
+```
+
+## 注意事项
+
+1. **不要硬编码**：任何网站列表都应该动态生成
+2. **事件阻止要彻底**：mousedown/mouseup/click都要阻止
+3. **跨iframe通信要验证来源**：检查source标识
+4. **数据传递要加时间戳**：防止脏数据
+5. **空状态要友好**：引导用户而非显示空白
+6. **调试日志要详细**：关键路径必须有日志
+7. **用户操作要有反馈**：加载中/成功/失败都要提示
+
+## manifest.json 关键配置
+
+```json
+{
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [{
+      "id": "remove_headers",
+      "enabled": true,
+      "path": "rules.json"
+    }]
+  },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content-scripts/iframe-injector.js"],
+    "all_frames": true  // 关键！让脚本在iframe中运行
+  }]
+}
+```
+
+## 总结经验
+
+### 技术突破
+1. 使用declarativeNetRequest绕过X-Frame-Options是关键突破
+2. postMessage + content script实现跨iframe通信
+3. 时间戳验证确保数据新鲜度
+
+### 用户体验
+1. 从标签页选择比硬编码更灵活
+2. 可视化元素选择比手写CSS选择器更友好
+3. 空状态引导比空白页面更好
+
+### 避免的坑
+1. 不要依赖自动填充（引导用户手动输入更可靠）
+2. 不要只阻止click（要阻止mousedown/mouseup）
+3. 不要使用硬编码（完全动态化）
+4. 不要忘记清理临时数据（防止内存泄漏）
+
+---
+最后更新: 2025-10-15
+版本: 1.0.0
+
