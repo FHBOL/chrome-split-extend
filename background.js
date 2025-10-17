@@ -138,42 +138,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     console.log('插件首次安装');
-    // 初始化存储
-    const defaultSites = [
-      {
-        id: 'chatgpt',
-        name: 'ChatGPT',
-        url: 'https://chatgpt.com/',
-        inputSelector: '#prompt-textarea',
-        sendButtonSelector: 'button[data-testid="send-button"]',
-        enabled: true,
-        isCustom: false
-      },
-      {
-        id: 'gemini',
-        name: 'Gemini',
-        url: 'https://gemini.google.com/',
-        inputSelector: '.ql-editor',
-        sendButtonSelector: 'button[aria-label*="Send"]',
-        enabled: true,
-        isCustom: false
-      },
-      {
-        id: 'claude',
-        name: 'Claude',
-        url: 'https://claude.ai/',
-        inputSelector: 'div[contenteditable="true"]',
-        sendButtonSelector: 'button[aria-label="Send Message"]',
-        enabled: true,
-        isCustom: false
-      }
-    ];
-    
-    chrome.storage.sync.get(['aiSites'], (result) => {
-      if (!result.aiSites) {
-        chrome.storage.sync.set({ aiSites: defaultSites });
-      }
-    });
+    // 不再初始化默认站点 - 完全由用户从标签页选择
+    console.log('请使用"从标签页选择并分屏"功能选择要使用的AI网站');
   }
 });
 

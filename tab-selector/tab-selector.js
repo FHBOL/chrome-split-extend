@@ -169,11 +169,13 @@ async function startSplitView() {
       };
     });
     
-    // 保存到storage
+    // 保存到storage（临时传递 + 当前分屏记录）
     console.log('tab-selector: 准备保存的网站数据:', sites);
     await chrome.storage.local.set({ 
       selectedSitesForSplit: sites,
-      splitViewTimestamp: Date.now()
+      splitViewTimestamp: Date.now(),
+      currentSplitSites: sites,
+      currentSplitTimestamp: Date.now()
     });
     console.log('tab-selector: 数据已保存到storage.local');
     

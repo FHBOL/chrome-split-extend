@@ -9,6 +9,42 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   z-index: 999999;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  pointer-events: auto;
+}
+
+/* 最小化状态 */
+#ai-selector-panel.minimized {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: move;
+}
+
+#ai-selector-panel.minimized .panel-content,
+#ai-selector-panel.minimized .panel-header h3 {
+  display: none;
+}
+
+#ai-selector-panel.minimized .panel-header {
+  padding: 0;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+#ai-selector-panel.minimized .panel-header::after {
+  content: "🎯";
+  font-size: 28px;
+}
+
+#ai-selector-panel.minimized #close-panel,
+#ai-selector-panel.minimized #minimize-panel {
+  display: none;
 }
 
 .panel-header {
@@ -19,12 +55,35 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  cursor: move;
+  user-select: none;
 }
 
 .panel-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+  flex: 1;
+}
+
+#minimize-panel {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  margin-right: 8px;
+}
+
+#minimize-panel:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 #close-panel {
@@ -140,25 +199,26 @@
   margin-top: 16px;
 }
 
-/* 提示框 */
+/* 提示框 - 改到顶部，不挡住元素 */
 #selector-hint {
   position: fixed;
-  top: 50%;
+  top: 80px;
   left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.9);
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
   color: white;
-  padding: 24px 40px;
-  border-radius: 16px;
-  font-size: 16px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 500;
   z-index: 1000000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  animation: fadeIn 0.3s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  animation: slideDown 0.3s ease;
   display: none;
-  max-width: 500px;
+  max-width: 400px;
   text-align: center;
-  line-height: 1.8;
+  line-height: 1.6;
+  pointer-events: none; /* 关键！让提示框不阻挡鼠标点击 */
 }
 
 #selector-hint.success {
@@ -181,14 +241,14 @@
   margin: 8px 0;
 }
 
-@keyframes fadeIn {
+@keyframes slideDown {
   from {
     opacity: 0;
-    transform: translate(-50%, -60%);
+    transform: translate(-50%, -20px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
   }
 }
 

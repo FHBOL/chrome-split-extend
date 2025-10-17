@@ -13,6 +13,7 @@
     panel.innerHTML = `
       <div class="panel-header">
         <h3>🎯 配置 ${siteName}</h3>
+        <button id="minimize-panel" title="最小化">−</button>
         <button id="close-panel">✕</button>
       </div>
       <div class="panel-content">
@@ -32,7 +33,7 @@
           </button>
         </div>
         <div class="panel-hint">
-          💡 提示：点击按钮后，鼠标会变成十字准星，移动到目标元素上点击即可选择
+          💡 提示：可拖动面板标题栏移动位置，点击"−"最小化
         </div>
       </div>
     `;
@@ -40,9 +41,67 @@
 
     // 绑定事件
     document.getElementById('close-panel').addEventListener('click', cleanup);
+    document.getElementById('minimize-panel').addEventListener('click', toggleMinimize);
     document.getElementById('pick-input').addEventListener('click', startPickingInput);
     document.getElementById('pick-send').addEventListener('click', startPickingSend);
     document.getElementById('save-config').addEventListener('click', saveConfig);
+    
+    // 启用拖拽
+    makeDraggable(panel);
+  }
+
+  // 最小化/展开面板
+  function toggleMinimize() {
+    const panel = document.getElementById('ai-selector-panel');
+    panel.classList.toggle('minimized');
+  }
+
+  // 让面板可拖拽
+  function makeDraggable(panel) {
+    const header = panel.querySelector('.panel-header');
+    let isDragging = false;
+    let currentX, currentY, initialX, initialY;
+
+    header.addEventListener('mousedown', (e) => {
+      // 点击最小化或关闭按钮时不拖拽
+      if (e.target.id === 'minimize-panel' || e.target.id === 'close-panel') return;
+      
+      isDragging = true;
+      initialX = e.clientX - panel.offsetLeft;
+      initialY = e.clientY - panel.offsetTop;
+      
+      // 如果是最小化状态，双击展开
+      if (panel.classList.contains('minimized')) {
+        const now = Date.now();
+        const lastClick = panel._lastClickTime || 0;
+        if (now - lastClick < 300) {
+          panel.classList.remove('minimized');
+          isDragging = false;
+          return;
+        }
+        panel._lastClickTime = now;
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      currentX = e.clientX - initialX;
+      currentY = e.clientY - initialY;
+      
+      // 限制在视口内
+      currentX = Math.max(0, Math.min(currentX, window.innerWidth - panel.offsetWidth));
+      currentY = Math.max(0, Math.min(currentY, window.innerHeight - panel.offsetHeight));
+      
+      panel.style.left = currentX + 'px';
+      panel.style.top = currentY + 'px';
+      panel.style.right = 'auto';
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
   }
 
   // 开始选择输入框
@@ -144,39 +203,207 @@
 
   // 生成CSS选择器
   function generateSelector(element) {
-    // 优先使用ID
+    console.log('生成选择器，元素:', element);
+    
+    // 生成多个候选选择器，选择最优的
+    const candidates = generateSelectorCandidates(element);
+    const bestSelector = selectBestSelector(candidates);
+    
+    console.log('最佳选择器:', bestSelector);
+    return bestSelector;
+  }
+  
+  // 生成多个候选选择器
+  function generateSelectorCandidates(element) {
+    const candidates = [];
+    
+    // 1. 优先使用ID（最稳定）
     if (element.id) {
-      return `#${element.id}`;
+      console.log('候选: ID选择器:', element.id);
+      candidates.push({
+        selector: `#${element.id}`,
+        priority: 100,
+        type: 'ID'
+      });
     }
 
-    // 使用特殊属性
-    const specialAttrs = ['data-testid', 'aria-label', 'name', 'placeholder', 'role'];
+    // 2. 使用语义化属性（按稳定性排序）
+    const specialAttrs = [
+      { name: 'data-testid', priority: 90 },
+      { name: 'aria-label', priority: 85 },
+      { name: 'type', priority: 80 },
+      { name: 'name', priority: 70 },
+      { name: 'placeholder', priority: 60 },
+      { name: 'role', priority: 50 }
+    ];
+    
     for (const attr of specialAttrs) {
-      const value = element.getAttribute(attr);
+      const value = element.getAttribute(attr.name);
       if (value) {
-        return `${element.tagName.toLowerCase()}[${attr}="${value}"]`;
+        let selector;
+        // 对于aria-label，使用部分匹配（更灵活）
+        if (attr.name === 'aria-label' && value.length > 10) {
+          const shortValue = value.substring(0, 20);
+          selector = `${element.tagName.toLowerCase()}[${attr.name}*="${shortValue}"]`;
+        } else {
+          selector = `${element.tagName.toLowerCase()}[${attr.name}="${value}"]`;
+        }
+        
+        candidates.push({
+          selector: selector,
+          priority: attr.priority,
+          type: attr.name
+        });
       }
     }
 
-    // 使用class
+    // 3. 对于按钮，使用type属性
+    if (element.tagName === 'BUTTON' && element.type === 'submit') {
+      candidates.push({
+        selector: 'button[type="submit"]',
+        priority: 75,
+        type: 'submit-button'
+      });
+    }
+
+    // 4. 过滤class，排除通用的框架类名
     if (element.className && typeof element.className === 'string') {
-      const classes = element.className.split(' ').filter(c => c && !c.match(/^(is-|has-)/));
-      if (classes.length > 0 && classes.length <= 3) {
-        return `${element.tagName.toLowerCase()}.${classes.slice(0, 2).join('.')}`;
+      const classes = element.className.split(' ').filter(c => {
+        if (!c) return false;
+        // 排除通用的Material Design类名
+        if (c.startsWith('mat-') || c.startsWith('mdc-')) return false;
+        // 排除Angular动态生成的类名
+        if (c.match(/^ng-/)) return false;
+        // 排除样式工具类
+        if (c.match(/^(is-|has-|flex|grid|col-|row-|m-|p-|text-|bg-)/)) return false;
+        // 排除包含随机字符的类名
+        if (c.match(/[0-9]{5,}/)) return false;
+        return true;
+      });
+      
+      if (classes.length > 0) {
+        // 优先使用有语义的类名
+        const meaningfulClass = classes.find(c => 
+          c.includes('send') || c.includes('submit') || c.includes('button') ||
+          c.includes('input') || c.includes('chat') || c.includes('message')
+        );
+        
+        if (meaningfulClass) {
+          candidates.push({
+            selector: `${element.tagName.toLowerCase()}.${meaningfulClass}`,
+            priority: 60,
+            type: 'meaningful-class'
+          });
+        }
+        
+        // 使用第一个非通用类名
+        if (classes.length <= 3 && classes[0]) {
+          candidates.push({
+            selector: `${element.tagName.toLowerCase()}.${classes[0]}`,
+            priority: 40,
+            type: 'class'
+          });
+        }
       }
     }
 
-    // 使用nth-child
+    // 5. 尝试使用父元素+nth-child
     const parent = element.parentElement;
     if (parent) {
-      const siblings = Array.from(parent.children);
-      const index = siblings.indexOf(element) + 1;
-      const parentSelector = parent.tagName.toLowerCase();
-      return `${parentSelector} > ${element.tagName.toLowerCase()}:nth-child(${index})`;
+      const siblings = Array.from(parent.children).filter(child => 
+        child.tagName === element.tagName
+      );
+      
+      if (siblings.length <= 5) {
+        const index = siblings.indexOf(element) + 1;
+        let parentSelector = parent.tagName.toLowerCase();
+        
+        if (parent.id) {
+          parentSelector = `#${parent.id}`;
+        } else if (parent.className) {
+          const parentClasses = parent.className.split(' ').filter(c => 
+            c && !c.match(/^(mat-|mdc-|ng-|is-|has-)/)
+          );
+          if (parentClasses.length > 0) {
+            parentSelector += `.${parentClasses[0]}`;
+          }
+        }
+        
+        candidates.push({
+          selector: `${parentSelector} > ${element.tagName.toLowerCase()}:nth-child(${index})`,
+          priority: 30,
+          type: 'nth-child'
+        });
+      }
     }
 
-    // 最后使用标签名
-    return element.tagName.toLowerCase();
+    // 6. 最后的兜底：使用标签名
+    candidates.push({
+      selector: element.tagName.toLowerCase(),
+      priority: 1,
+      type: 'fallback'
+    });
+    
+    return candidates;
+  }
+  
+  // 选择最佳选择器
+  function selectBestSelector(candidates) {
+    if (candidates.length === 0) {
+      console.warn('没有找到任何候选选择器');
+      return 'unknown';
+    }
+    
+    // 验证每个候选选择器的唯一性
+    const validatedCandidates = candidates.map(candidate => {
+      try {
+        const matches = document.querySelectorAll(candidate.selector);
+        candidate.matchCount = matches.length;
+        candidate.isUnique = matches.length === 1;
+        
+        console.log(`验证选择器: ${candidate.selector}`);
+        console.log(`  类型: ${candidate.type}, 优先级: ${candidate.priority}`);
+        console.log(`  匹配数量: ${matches.length} ${matches.length === 1 ? '✅' : '⚠️'}`);
+        
+        return candidate;
+      } catch (e) {
+        console.error(`选择器无效: ${candidate.selector}`, e);
+        candidate.matchCount = Infinity;
+        candidate.isUnique = false;
+        return candidate;
+      }
+    });
+    
+    // 排序：优先选择唯一且优先级高的
+    validatedCandidates.sort((a, b) => {
+      // 唯一性最重要
+      if (a.isUnique && !b.isUnique) return -1;
+      if (!a.isUnique && b.isUnique) return 1;
+      
+      // 如果都唯一或都不唯一，比较优先级
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
+      
+      // 如果优先级相同，选择匹配数量少的
+      return a.matchCount - b.matchCount;
+    });
+    
+    const best = validatedCandidates[0];
+    
+    // 警告：选择器不唯一
+    if (!best.isUnique) {
+      console.warn(`⚠️ 最佳选择器仍然匹配到 ${best.matchCount} 个元素！`);
+      console.warn(`   选择器: ${best.selector}`);
+      console.warn(`   可能导致误触发其他元素`);
+      
+      // 显示提示给用户
+      showHint(`⚠️ 此选择器匹配到 ${best.matchCount} 个元素，可能不够精确。建议重新选择或手动调整。`, 'warning', 5000);
+    } else {
+      console.log(`✅ 找到唯一选择器: ${best.selector} (${best.type})`);
+    }
+    
+    return best.selector;
   }
 
   // 检查是否完成
@@ -200,7 +427,7 @@
   }
 
   // 显示提示
-  function showHint(message, type = 'info', duration = 3000) {
+  function showHint(message, type = 'info', duration = 2000) {
     let hint = document.getElementById('selector-hint');
     if (!hint) {
       hint = document.createElement('div');
@@ -209,14 +436,16 @@
     }
 
     hint.innerHTML = message; // 支持HTML
-    hint.className = `selector-hint ${type}`;
+    hint.className = type;
     hint.style.display = 'block';
 
-    if (type === 'success' || type === 'warning') {
-      setTimeout(() => {
-        hint.style.display = 'none';
-      }, duration);
-    }
+    // 清除之前的定时器
+    if (hint._timer) clearTimeout(hint._timer);
+
+    // 所有提示都自动消失，不挡住元素选择
+    hint._timer = setTimeout(() => {
+      hint.style.display = 'none';
+    }, duration);
   }
 
   // 清理

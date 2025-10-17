@@ -33,16 +33,8 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://chat.openai.com/*",
-        "https://chatgpt.com/*",
-        "https://gemini.google.com/*",
-        "https://claude.ai/*",
-        "https://deepseek.com/*",
-        "https://poe.com/*",
-        "https://bard.google.com/*"
-      ],
-      "js": ["content-scripts/injector.js", "content-scripts/iframe-injector.js"],
+      "matches": ["<all_urls>"],
+      "js": ["content-scripts/iframe-injector.js"],
       "run_at": "document_idle",
       "all_frames": true
     }

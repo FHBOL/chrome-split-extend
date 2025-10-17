@@ -100,41 +100,8 @@ async function loadAISites() {
 async function getAISites() {
   return new Promise((resolve) => {
     chrome.storage.sync.get(['aiSites'], (result) => {
-      if (result.aiSites) {
-        resolve(result.aiSites);
-      } else {
-        // 使用默认配置
-        const defaultSites = [
-          {
-            id: 'chatgpt',
-            name: 'ChatGPT',
-            url: 'https://chatgpt.com/',
-            inputSelector: '#prompt-textarea',
-            sendButtonSelector: 'button[data-testid="send-button"]',
-            enabled: true,
-            isCustom: false
-          },
-          {
-            id: 'gemini',
-            name: 'Gemini',
-            url: 'https://gemini.google.com/',
-            inputSelector: '.ql-editor',
-            sendButtonSelector: 'button[aria-label*="Send"]',
-            enabled: true,
-            isCustom: false
-          },
-          {
-            id: 'claude',
-            name: 'Claude',
-            url: 'https://claude.ai/',
-            inputSelector: 'div[contenteditable="true"]',
-            sendButtonSelector: 'button[aria-label="Send Message"]',
-            enabled: true,
-            isCustom: false
-          }
-        ];
-        resolve(defaultSites);
-      }
+      // 完全由用户从标签页选择，不提供默认站点
+      resolve(result.aiSites || []);
     });
   });
 }

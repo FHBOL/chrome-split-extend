@@ -1,19 +1,32 @@
 // iframe内部注入脚本 - 监听来自父页面的消息
 console.log('AI聚合器 - iframe注入脚本已加载');
 
-// 检测当前是哪个AI网站
-let currentSite = null;
+// 当前网站的配置
+let siteConfig = null;
 const hostname = window.location.hostname;
+console.log('当前hostname:', hostname);
 
-if (hostname.includes('openai.com') || hostname.includes('chatgpt.com')) {
-  currentSite = 'chatgpt';
-} else if (hostname.includes('gemini.google.com')) {
-  currentSite = 'gemini';
-} else if (hostname.includes('claude.ai')) {
-  currentSite = 'claude';
+// 加载配置
+async function loadSiteConfig() {
+  try {
+    const siteId = hostname.replace(/[^a-zA-Z0-9]/g, '_');
+    const result = await chrome.storage.local.get(['aiSelectorConfigs']);
+    const allConfigs = result.aiSelectorConfigs || {};
+    
+    siteConfig = allConfigs[siteId];
+    
+    if (siteConfig) {
+      console.log('已加载网站配置:', siteConfig);
+    } else {
+      console.log('未找到配置，使用通用选择器');
+    }
+  } catch (error) {
+    console.error('加载配置失败:', error);
+  }
 }
 
-console.log('检测到网站:', currentSite);
+// 页面加载时就加载配置
+loadSiteConfig();
 
 // 监听来自父页面的postMessage
 window.addEventListener('message', (event) => {
@@ -29,29 +42,46 @@ window.addEventListener('message', (event) => {
 
 // 填充输入框并发送消息
 function fillAndSendMessage(text) {
-  console.log('开始填充消息:', text);
+  console.log('🚀 开始填充消息:', text);
+  console.log('📍 当前hostname:', hostname);
+  console.log('⚙️ 当前配置:', siteConfig);
   
   // 查找输入框
   const inputElement = findInputElement();
   if (!inputElement) {
-    console.error('未找到输入框');
+    console.error('❌ 未找到输入框');
     return;
   }
   
-  console.log('找到输入框:', inputElement);
+  console.log('✅ 找到输入框:', inputElement);
+  console.log('   - 标签:', inputElement.tagName);
+  console.log('   - ID:', inputElement.id);
+  console.log('   - Class:', inputElement.className);
   
   // 填充文本
   fillInput(inputElement, text);
   
   // 等待后点击发送按钮
   setTimeout(() => {
+    console.log('🔍 开始查找发送按钮...');
     const sendButton = findSendButton();
-    if (sendButton && !sendButton.disabled) {
-      console.log('找到发送按钮，准备点击');
-      sendButton.click();
-      console.log('已点击发送按钮');
+    
+    if (sendButton) {
+      console.log('✅ 找到发送按钮:', sendButton);
+      console.log('   - 标签:', sendButton.tagName);
+      console.log('   - ID:', sendButton.id);
+      console.log('   - Class:', sendButton.className);
+      console.log('   - 禁用状态:', sendButton.disabled);
+      
+      if (!sendButton.disabled) {
+        console.log('👆 准备点击发送按钮...');
+        sendButton.click();
+        console.log('✅ 已点击发送按钮');
+      } else {
+        console.warn('⚠️ 发送按钮被禁用');
+      }
     } else {
-      console.log('未找到发送按钮，尝试按Enter键');
+      console.warn('⚠️ 未找到发送按钮，尝试按Enter键');
       // 尝试按Enter键
       const enterEvent = new KeyboardEvent('keydown', {
         key: 'Enter',
@@ -62,27 +92,76 @@ function fillAndSendMessage(text) {
         cancelable: true
       });
       inputElement.dispatchEvent(enterEvent);
+      console.log('✅ 已触发Enter键事件');
     }
   }, 500);
 }
 
 // 查找输入框
 function findInputElement() {
+  // 优先使用配置中的选择器
+  if (siteConfig && siteConfig.inputSelector) {
+    try {
+      console.log('使用配置的输入框选择器:', siteConfig.inputSelector);
+      const element = document.querySelector(siteConfig.inputSelector);
+      if (element && isVisible(element)) {
+        console.log('✅ 通过配置选择器找到输入框');
+        return element;
+      } else {
+        console.warn('⚠️ 配置的选择器未找到可见元素');
+      }
+    } catch (e) {
+      console.error('❌ 配置的选择器无效:', e);
+    }
+  }
+  
+  console.log('🔄 尝试使用通用选择器...');
+  
+  // 完全通用的选择器策略 - 零硬编码
+  // 按照稳定性和常见度排序，适用于任何网站
   const selectors = [
-    // ChatGPT
+    // 1. ID选择器（最稳定）
     '#prompt-textarea',
-    'textarea[data-id="root"]',
-    'textarea[placeholder*="Message"]',
-    // Gemini
+    '#chat-input',
+    '#message-input',
+    '#input',
+    '#textarea',
+    
+    // 2. Quill编辑器（常见富文本编辑器）
     '.ql-editor',
-    'div.ql-editor[contenteditable="true"]',
-    'textarea[placeholder*="询问"]',
-    // Claude
-    'div[contenteditable="true"][role="textbox"]',
-    'div.ProseMirror',
-    // 通用
-    'textarea:not([style*="display: none"])',
+    '[class*="ql-editor"]',
+    
+    // 3. ProseMirror编辑器
+    '.ProseMirror',
+    '[class*="ProseMirror"]',
+    
+    // 4. 语义化属性（W3C标准，最可靠）
+    '[contenteditable="true"][role="textbox"]',
+    '[role="textbox"][contenteditable]',
+    'textarea[role="textbox"]',
+    
+    // 5. data属性（开发者明确标记）
+    'textarea[data-id]',
+    '[data-testid*="input"]',
+    '[data-testid*="textarea"]',
+    
+    // 6. aria-label（无障碍属性）
+    'textarea[aria-label]',
+    '[contenteditable="true"][aria-label]',
+    
+    // 7. placeholder属性（常见输入提示）
+    'textarea[placeholder]',
+    
+    // 8. 通用textarea（排除隐藏）
+    'textarea:not([style*="display: none"]):not([style*="display:none"])',
+    'textarea:not([hidden])',
+    
+    // 9. contentEditable（富文本编辑）
     'div[contenteditable="true"]',
+    '[contenteditable="true"]',
+    
+    // 10. 最后的兜底
+    'textarea',
     'input[type="text"]'
   ];
   
@@ -110,19 +189,70 @@ function findInputElement() {
 
 // 查找发送按钮
 function findSendButton() {
+  // 优先使用配置中的选择器
+  if (siteConfig && siteConfig.sendButtonSelector) {
+    try {
+      console.log('使用配置的发送按钮选择器:', siteConfig.sendButtonSelector);
+      const button = document.querySelector(siteConfig.sendButtonSelector);
+      if (button && isVisible(button)) {
+        console.log('✅ 通过配置选择器找到发送按钮');
+        return button;
+      } else {
+        console.warn('⚠️ 配置的选择器未找到可见按钮');
+      }
+    } catch (e) {
+      console.error('❌ 配置的选择器无效:', e);
+    }
+  }
+  
+  console.log('🔄 尝试使用通用发送按钮选择器...');
+  
+  // 完全通用的选择器策略 - 零硬编码
+  // 按照稳定性和准确度排序
   const selectors = [
-    'button[data-testid="send-button"]',
+    // 1. data-testid（测试ID，最稳定）
+    'button[data-testid*="send"]',
+    'button[data-testid*="submit"]',
+    
+    // 2. aria-label（无障碍属性，W3C标准）
     'button[aria-label*="Send"]',
+    'button[aria-label*="send"]',
     'button[aria-label*="发送"]',
+    'button[aria-label*="提交"]',
+    'button[aria-label*="Submit"]',
+    
+    // 3. type属性
     'button[type="submit"]',
-    'button:has(svg[data-icon="paper-plane"])',
-    'button:has(svg[class*="send"])'
+    'input[type="submit"]',
+    
+    // 4. title属性
+    'button[title*="Send"]',
+    'button[title*="发送"]',
+    
+    // 5. 包含特定图标的按钮
+    'button:has(svg[data-icon*="send"])',
+    'button:has(svg[data-icon*="paper-plane"])',
+    'button:has(svg[data-icon*="arrow"])',
+    
+    // 6. 包含特定class的按钮
+    'button[class*="send"]',
+    'button[class*="submit"]',
+    
+    // 7. 包含特定文本的按钮
+    'button:has-text("Send")',
+    'button:has-text("发送")',
+    'button:has-text("提交")',
+    
+    // 8. 最后的兜底 - 查找离输入框最近的按钮
+    'button[type="submit"]',
+    'button'
   ];
   
   for (const selector of selectors) {
     try {
       const button = document.querySelector(selector);
       if (button && isVisible(button) && !button.disabled) {
+        console.log('✅ 通过通用选择器找到发送按钮:', selector);
         return button;
       }
     } catch (e) {
@@ -130,6 +260,24 @@ function findSendButton() {
     }
   }
   
+  // 最后的兜底策略：查找输入框附近的submit按钮
+  console.log('🔍 尝试查找输入框附近的按钮...');
+  const inputElement = findInputElement();
+  if (inputElement) {
+    let parent = inputElement.parentElement;
+    let level = 0;
+    while (parent && level < 5) {
+      const submitBtn = parent.querySelector('button[type="submit"]:not([disabled])');
+      if (submitBtn && isVisible(submitBtn)) {
+        console.log('✅ 在输入框附近找到submit按钮');
+        return submitBtn;
+      }
+      parent = parent.parentElement;
+      level++;
+    }
+  }
+  
+  console.warn('❌ 未找到任何发送按钮');
   return null;
 }
 

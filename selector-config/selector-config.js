@@ -19,6 +19,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadExistingConfigs() {
   const result = await chrome.storage.local.get(['aiSelectorConfigs']);
   allConfigs = result.aiSelectorConfigs || {};
+
+  // 规范化配置键名：支持多种旧格式统一到hostname-based ID
+  // 1. 旧的名称键 (ChatGPT, Gemini等)
+  // 2. 短域名键 (chatgpt, gemini等)
+  // 3. 完整域名键 (chatgpt_com, gemini_google_com等)
+  const normalizedConfigs = {};
+  
+  for (const [key, config] of Object.entries(allConfigs)) {
+    // 已经是规范的hostname_based格式（包含下划线）
+    if (key.includes('_')) {
+      normalizedConfigs[key] = config;
+    } else {
+      // 旧格式：尝试映射到新格式
+      const keyLower = key.toLowerCase();
+      const hostMap = {
+        'chatgpt': 'chatgpt_com',
+        'gemini': 'gemini_google_com', 
+        'claude': 'claude_ai',
+        'qwen': 'chat_qwen_ai',
+        'deepseek': 'chat_deepseek_com',
+        'kimi': 'kimi_moonshot_cn'
+      };
+      const newKey = hostMap[keyLower] || key;
+      normalizedConfigs[newKey] = config;
+    }
+  }
+  
+  // 如果键名有变化，更新存储
+  if (JSON.stringify(Object.keys(allConfigs).sort()) !== JSON.stringify(Object.keys(normalizedConfigs).sort())) {
+    allConfigs = normalizedConfigs;
+    await saveConfigs();
+    console.log('配置键名已规范化:', Object.keys(allConfigs));
+  } else {
+    allConfigs = normalizedConfigs;
+  }
 }
 
 // 保存配置
@@ -32,18 +67,39 @@ async function renderAIList() {
   container.innerHTML = '<p class="loading">正在获取已打开的标签页...</p>';
 
   try {
-    // 获取所有标签页
-    const tabs = await chrome.tabs.query({});
-    
-    // 过滤出https网站（排除扩展页面、本地文件等）
-    const validTabs = tabs.filter(tab => 
-      tab.url && 
-      (tab.url.startsWith('http://') || tab.url.startsWith('https://')) &&
-      !tab.url.includes('chrome://') &&
-      !tab.url.includes('chrome-extension://')
-    );
+    // 优先读取当前分屏中的网站（由tab-selector或split-view写入）
+    const { currentSplitSites } = await chrome.storage.local.get(['currentSplitSites']);
+    let uniqueTabs = [];
 
-    if (validTabs.length === 0) {
+    if (Array.isArray(currentSplitSites) && currentSplitSites.length > 0) {
+      // 仅显示当前分屏中的网站
+      uniqueTabs = currentSplitSites.map(site => ({
+        id: Math.random(),
+        url: site.url,
+        title: site.name
+      }));
+    } else {
+      // 回退：读取当前窗口标签页并按hostname去重
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      const validTabs = tabs.filter(tab => 
+        tab.url && 
+        (tab.url.startsWith('http://') || tab.url.startsWith('https://')) &&
+        !tab.url.includes('chrome://') &&
+        !tab.url.includes('chrome-extension://')
+      );
+
+      const seenHosts = new Set();
+      for (const tab of validTabs) {
+        try {
+          const host = new URL(tab.url).hostname;
+          if (seenHosts.has(host)) continue;
+          seenHosts.add(host);
+          uniqueTabs.push(tab);
+        } catch (e) {}
+      }
+    }
+
+    if (uniqueTabs.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">📭</div>
@@ -58,8 +114,8 @@ async function renderAIList() {
 
     container.innerHTML = '';
 
-    // 为每个标签页创建卡片
-    validTabs.forEach(tab => {
+    // 为每个唯一网站创建卡片
+    uniqueTabs.forEach(tab => {
       const url = new URL(tab.url);
       const hostname = url.hostname;
       const siteName = tab.title || hostname;
@@ -67,7 +123,7 @@ async function renderAIList() {
       // 生成唯一ID（基于hostname）
       const siteId = hostname.replace(/[^a-zA-Z0-9]/g, '_');
       
-      // 检查是否已配置
+      // 检查是否已配置（支持旧键名迁移后的匹配）
       const isConfigured = !!allConfigs[siteId];
       
       const card = document.createElement('div');
@@ -358,20 +414,23 @@ function updateConfiguredList() {
   container.innerHTML = '';
 
   configs.forEach(([id, config]) => {
+    // 根据ID推断显示名称
     const aiNames = {
-      chatgpt: 'ChatGPT',
-      gemini: 'Gemini',
-      claude: 'Claude',
-      qwen: 'Qwen',
-      deepseek: 'DeepSeek',
-      kimi: 'Kimi'
+      'chatgpt_com': 'ChatGPT',
+      'gemini_google_com': 'Gemini',
+      'claude_ai': 'Claude',
+      'chat_qwen_ai': 'Qwen',
+      'chat_deepseek_com': 'DeepSeek',
+      'kimi_moonshot_cn': 'Kimi'
     };
+
+    const displayName = aiNames[id] || id.replace(/_/g, '.');
 
     const item = document.createElement('div');
     item.className = 'configured-item';
     item.innerHTML = `
       <div class="configured-item-info">
-        <div class="configured-item-name">${aiNames[id] || id}</div>
+        <div class="configured-item-name">${displayName}</div>
         <div class="configured-item-selectors">
           输入框: <code>${config.inputSelector}</code> | 
           发送按钮: <code>${config.sendButtonSelector}</code>

@@ -36,6 +36,11 @@ async function loadConfig() {
           (now - localResult.splitViewTimestamp < 5000)) {
         aiSites = localResult.selectedSitesForSplit;
         console.log('split-view: 使用tab-selector传递的数据:', aiSites);
+        // 将当前分屏站点写入local，便于其他页面（如选择器配置）读取
+        chrome.storage.local.set({
+          currentSplitSites: aiSites,
+          currentSplitTimestamp: Date.now()
+        });
         // 清除临时数据
         chrome.storage.local.remove(['selectedSitesForSplit', 'splitViewTimestamp']);
         resolve();
@@ -45,6 +50,11 @@ async function loadConfig() {
         chrome.storage.sync.get(['aiSites'], (result) => {
           aiSites = (result.aiSites || []).filter(site => site.enabled);
           console.log('split-view: 从sync storage加载的数据:', aiSites);
+          // 同步当前分屏站点到local
+          chrome.storage.local.set({
+            currentSplitSites: aiSites,
+            currentSplitTimestamp: Date.now()
+          });
           resolve();
         });
       }
@@ -316,8 +326,18 @@ async function sendToAllAI() {
   const iframes = document.querySelectorAll('.iframe-container iframe');
   
   // 方法1: 尝试通过postMessage发送到iframe
+  console.log('📤 准备向', iframes.length, '个iframe发送消息');
   iframes.forEach((iframe, index) => {
     try {
+      const iframeSrc = iframe.src;
+      console.log(`📤 向iframe ${index} (${iframeSrc}) 发送消息:`, text);
+      
+      // 检查iframe是否加载完成
+      if (!iframe.contentWindow) {
+        console.error(`❌ iframe ${index} 的contentWindow不可访问`);
+        return;
+      }
+      
       // 向iframe发送消息
       iframe.contentWindow.postMessage({
         action: 'fillAndSend',
@@ -325,10 +345,10 @@ async function sendToAllAI() {
         source: 'ai-aggregator'
       }, '*');
       
-      console.log(`已向iframe ${index} 发送消息`);
+      console.log(`✅ 已向iframe ${index} 发送postMessage`);
       successCount++;
     } catch (error) {
-      console.error(`向iframe ${index} 发送失败:`, error);
+      console.error(`❌ 向iframe ${index} 发送失败:`, error);
     }
   });
   
