@@ -189,11 +189,31 @@
   color: #999;
 }
 
+.helper-text {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.5;
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: #f8f9fa;
+  border-left: 3px solid #667eea;
+  border-radius: 4px;
+}
+
+.helper-text code {
+  background: #e9ecef;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 10px;
+  color: #667eea;
+}
+
 .panel-hint {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
   background: #fff3cd;
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: 6px;
   line-height: 1.5;
   margin-top: 16px;

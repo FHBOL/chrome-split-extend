@@ -34,7 +34,10 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content-scripts/iframe-injector.js"],
+      "js": [
+        "content-scripts/fallback-strategies.js",
+        "content-scripts/iframe-injector.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }

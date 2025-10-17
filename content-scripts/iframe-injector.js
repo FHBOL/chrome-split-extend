@@ -61,7 +61,7 @@ function fillAndSendMessage(text) {
   // 填充文本
   fillInput(inputElement, text);
   
-  // 等待后点击发送按钮
+  // 等待后点击发送按钮或触发Enter键
   setTimeout(() => {
     console.log('🔍 开始查找发送按钮...');
     const sendButton = findSendButton();
@@ -75,26 +75,118 @@ function fillAndSendMessage(text) {
       
       if (!sendButton.disabled) {
         console.log('👆 准备点击发送按钮...');
-        sendButton.click();
-        console.log('✅ 已点击发送按钮');
+        
+        // 通用点击策略：模拟真实用户的完整交互流程
+        // 适用于任何可点击元素（button、div、span、a等）
+        try {
+          // 1. 聚焦元素
+          if (typeof sendButton.focus === 'function') {
+            sendButton.focus();
+          }
+          
+          // 2. 完整的鼠标事件序列（模拟真实用户点击）
+          const mouseEventOptions = { 
+            bubbles: true, 
+            cancelable: true,
+            view: window,
+            detail: 1
+          };
+          
+          sendButton.dispatchEvent(new MouseEvent('mouseover', mouseEventOptions));
+          sendButton.dispatchEvent(new MouseEvent('mouseenter', mouseEventOptions));
+          sendButton.dispatchEvent(new MouseEvent('mousedown', mouseEventOptions));
+          sendButton.dispatchEvent(new MouseEvent('mouseup', mouseEventOptions));
+          sendButton.dispatchEvent(new MouseEvent('click', mouseEventOptions));
+          
+          // 3. 现代指针事件（适用于触摸屏和鼠标）
+          const pointerEventOptions = {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            pointerId: 1,
+            pointerType: 'mouse'
+          };
+          
+          sendButton.dispatchEvent(new PointerEvent('pointerover', pointerEventOptions));
+          sendButton.dispatchEvent(new PointerEvent('pointerenter', pointerEventOptions));
+          sendButton.dispatchEvent(new PointerEvent('pointerdown', pointerEventOptions));
+          sendButton.dispatchEvent(new PointerEvent('pointerup', pointerEventOptions));
+          sendButton.dispatchEvent(new PointerEvent('click', pointerEventOptions));
+          
+          // 4. 原生click方法（兜底）
+          sendButton.click();
+          
+          console.log('✅ 已触发所有点击事件');
+        } catch (e) {
+          console.error('点击按钮时出错:', e);
+          // 最后的兜底：只调用原生click
+          try {
+            sendButton.click();
+          } catch (e2) {
+            console.error('原生click也失败:', e2);
+          }
+        }
       } else {
         console.warn('⚠️ 发送按钮被禁用');
       }
     } else {
-      console.warn('⚠️ 未找到发送按钮，尝试按Enter键');
-      // 尝试按Enter键
-      const enterEvent = new KeyboardEvent('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-        cancelable: true
-      });
-      inputElement.dispatchEvent(enterEvent);
-      console.log('✅ 已触发Enter键事件');
+      console.warn('⚠️ 未找到发送按钮');
+      
+      // 使用通用降级策略链
+      if (typeof executeFallbackStrategies === 'function') {
+        executeFallbackStrategies(inputElement, findSendButton);
+      } else {
+        // 降级：使用简单的Enter键
+        console.log('⚠️ 降级策略未加载，使用简单Enter键');
+        triggerEnterKey(inputElement);
+      }
     }
   }, 500);
+}
+
+// 触发Enter键事件（通用函数）
+function triggerEnterKey(element) {
+  console.log('⌨️ 触发Enter键发送...');
+  
+  // 确保元素聚焦
+  element.focus();
+  
+  // 触发完整的键盘事件序列
+  const keydownEvent = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    code: 'Enter',
+    keyCode: 13,
+    which: 13,
+    bubbles: true,
+    cancelable: true,
+    composed: true
+  });
+  
+  const keypressEvent = new KeyboardEvent('keypress', {
+    key: 'Enter',
+    code: 'Enter',
+    keyCode: 13,
+    which: 13,
+    bubbles: true,
+    cancelable: true,
+    composed: true
+  });
+  
+  const keyupEvent = new KeyboardEvent('keyup', {
+    key: 'Enter',
+    code: 'Enter',
+    keyCode: 13,
+    which: 13,
+    bubbles: true,
+    cancelable: true,
+    composed: true
+  });
+  
+  element.dispatchEvent(keydownEvent);
+  element.dispatchEvent(keypressEvent);
+  element.dispatchEvent(keyupEvent);
+  
+  console.log('✅ 已触发Enter键事件序列');
 }
 
 // 查找输入框

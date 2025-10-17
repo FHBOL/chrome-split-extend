@@ -20,11 +20,17 @@
         <div class="panel-step">
           <div class="step-label">步骤 1：选择输入框</div>
           <button id="pick-input" class="panel-btn">📝 开始选择输入框</button>
+          <div class="helper-text">
+            <small>💡 常见类型：<code>textarea</code>（Qwen、豆包）、<code>contenteditable div</code>（ChatGPT、Gemini）、<code>.ql-editor</code>（Quill编辑器）</small>
+          </div>
           <div class="selected-info" id="input-info">未选择</div>
         </div>
         <div class="panel-step">
           <div class="step-label">步骤 2：选择发送按钮</div>
           <button id="pick-send" class="panel-btn">🚀 开始选择发送按钮</button>
+          <div class="helper-text">
+            <small>⚠️ 注意：点击按钮本身，不要点内部图标。常见类型：<code>&lt;button&gt;</code>（标准按钮）、<code>&lt;div&gt;</code>（DeepSeek等）。特征：<code>cursor:pointer</code>、<code>role="button"</code></small>
+          </div>
           <div class="selected-info" id="send-info">未选择</div>
         </div>
         <div class="panel-step">
@@ -33,7 +39,7 @@
           </button>
         </div>
         <div class="panel-hint">
-          💡 提示：可拖动面板标题栏移动位置，点击"−"最小化
+          💡 可拖动标题栏移动，点击"−"最小化。鼠标悬停时会显示元素类型提示。
         </div>
       </div>
     `;
@@ -109,7 +115,7 @@
     isPickingInput = true;
     isPickingSend = false;
     document.body.style.cursor = 'crosshair';
-    showHint('请点击输入框');
+    showHint('📝 请移动鼠标选择输入框，鼠标旁会显示元素类型提示', 'info', 3000);
   }
 
   // 开始选择发送按钮
@@ -117,12 +123,15 @@
     isPickingInput = false;
     isPickingSend = true;
     document.body.style.cursor = 'crosshair';
-    showHint('请点击发送按钮');
+    showHint('🚀 请移动鼠标选择发送按钮，注意不要选内部图标', 'info', 3000);
   }
 
   // 鼠标移动事件
   function handleMouseMove(e) {
     if (!isPickingInput && !isPickingSend) return;
+
+    // 更新浮动提示位置（跟随鼠标）
+    updateFloatingHintPosition(e);
 
     // 移除之前的高亮
     if (highlightedElement) {
@@ -131,9 +140,115 @@
 
     // 高亮当前元素
     const element = e.target;
-    if (element.id !== 'ai-selector-panel' && !element.closest('#ai-selector-panel')) {
+    if (element.id !== 'ai-selector-panel' && !element.closest('#ai-selector-panel') && 
+        element.id !== 'selector-hint' && !element.closest('#selector-hint') &&
+        element.id !== 'floating-element-hint') {
       element.style.outline = '3px solid #667eea';
       highlightedElement = element;
+      
+      // 显示当前元素的实时提示
+      showElementHint(element);
+    }
+  }
+
+  // 显示当前悬停元素的信息提示（跟随鼠标的小提示框）
+  function showElementHint(element) {
+    const tagName = element.tagName.toLowerCase();
+    const type = element.getAttribute('type');
+    const isContentEditable = element.contentEditable === 'true';
+    const role = element.getAttribute('role');
+    const ariaLabel = element.getAttribute('aria-label');
+    
+    let elementType = '';
+    let emoji = '';
+    
+    if (isPickingInput) {
+      // 判断输入框适配性
+      if (tagName === 'textarea') {
+        emoji = '✅';
+        elementType = 'TEXTAREA';
+      } else if (tagName === 'input' && type === 'text') {
+        emoji = '✅';
+        elementType = 'INPUT[text]';
+      } else if (isContentEditable) {
+        emoji = '✅';
+        elementType = 'ContentEditable';
+      } else if (element.classList.contains('ql-editor')) {
+        emoji = '✅';
+        elementType = 'Quill编辑器';
+      } else if (tagName === 'div' && element.querySelector('[contenteditable="true"]')) {
+        emoji = '⚠️';
+        elementType = '容器DIV';
+      } else {
+        emoji = '❌';
+        elementType = tagName.toUpperCase();
+      }
+    } else if (isPickingSend) {
+      // 通用的可点击元素判断 - 不依赖具体标签
+      const hasClickHandler = element.onclick || element.getAttribute('onclick');
+      const hasCursor = window.getComputedStyle(element).cursor === 'pointer';
+      const hasRole = role === 'button';
+      const hasClickableAttr = element.hasAttribute('data-clickable') || 
+                               element.hasAttribute('data-action');
+      
+      // 判断是否具有"可点击"特征
+      const isClickable = hasClickHandler || hasCursor || hasRole || hasClickableAttr;
+      
+      if (tagName === 'button') {
+        // 标准button元素
+        if (type === 'submit' || ariaLabel?.includes('发送') || ariaLabel?.includes('Send')) {
+          emoji = '✅';
+          elementType = 'BUTTON';
+        } else {
+          emoji = '⚠️';
+          elementType = 'BUTTON';
+        }
+      } else if (isClickable) {
+        // 任何具有可点击特征的元素都被认为是合适的
+        emoji = '✅';
+        elementType = `${tagName.toUpperCase()}(可点击)`;
+      } else if (tagName === 'span' || tagName === 'svg' || tagName === 'i') {
+        // 图标元素
+        emoji = '⚠️';
+        elementType = `${tagName.toUpperCase()}(图标?)`;
+      } else {
+        // 其他未知元素
+        emoji = '❓';
+        elementType = tagName.toUpperCase();
+      }
+    }
+    
+    // 创建或更新跟随鼠标的小提示
+    let floatingHint = document.getElementById('floating-element-hint');
+    if (!floatingHint) {
+      floatingHint = document.createElement('div');
+      floatingHint.id = 'floating-element-hint';
+      floatingHint.style.cssText = `
+        position: fixed;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        z-index: 10000000;
+        pointer-events: none;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      `;
+      document.body.appendChild(floatingHint);
+    }
+    
+    floatingHint.textContent = `${emoji} ${elementType}`;
+    floatingHint.style.display = 'block';
+  }
+  
+  // 更新浮动提示位置（跟随鼠标）
+  function updateFloatingHintPosition(e) {
+    const floatingHint = document.getElementById('floating-element-hint');
+    if (floatingHint && floatingHint.style.display === 'block') {
+      floatingHint.style.left = (e.clientX + 15) + 'px';
+      floatingHint.style.top = (e.clientY + 15) + 'px';
     }
   }
 
@@ -460,6 +575,9 @@
 
     const hint = document.getElementById('selector-hint');
     if (hint) hint.remove();
+
+    const floatingHint = document.getElementById('floating-element-hint');
+    if (floatingHint) floatingHint.remove();
 
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('click', handleClick, true);
