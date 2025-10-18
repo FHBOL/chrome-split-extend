@@ -1,0 +1,121 @@
+---
+globs: *.js
+description: JavaScript编码规范
+---
+
+# JavaScript 编码规范
+
+## 事件处理
+
+### 防止事件冒泡和默认行为
+
+在需要阻止事件传播时（特别是在element-picker等场景），必须彻底阻止：
+
+```javascript
+function handleClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation(); // 关键！阻止同元素的其他监听器
+}
+
+// 必须在捕获阶段监听所有鼠标事件
+document.addEventListener('mousedown', handleMouseDown, true); // capture阶段
+document.addEventListener('mouseup', handleMouseUp, true);
+document.addEventListener('click', handleClick, true);
+```
+
+## 动态元素创建
+
+### ❌ 错误做法
+使用字符串形式的onclick属性：
+```javascript
+element.innerHTML = `<button onclick="handleClick()">点击</button>`;
+```
+
+### ✅ 正确做法
+使用JavaScript直接绑定事件：
+```javascript
+const button = document.createElement('button');
+button.textContent = '点击';
+button.onclick = () => handleClick();
+// 或者
+button.addEventListener('click', handleClick);
+```
+
+## Chrome Extension API 使用
+
+### Storage API
+
+```javascript
+// 临时数据 - 使用 local storage + 时间戳
+await chrome.storage.local.set({ 
+  data: value,
+  timestamp: Date.now()
+});
+
+// 验证数据新鲜度（5秒内有效）
+if (data && Date.now() - timestamp < 5000) {
+  // 使用数据
+}
+
+// 持久配置 - 使用 sync storage
+await chrome.storage.sync.set({ 
+  config: value
+});
+```
+
+### PostMessage 通信
+
+```javascript
+// 发送消息时总是包含source标识
+iframe.contentWindow.postMessage({
+  action: 'someAction',
+  data: someData,
+  source: 'ai-aggregator' // 重要！用于验证来源
+}, '*');
+
+// 接收消息时验证来源
+window.addEventListener('message', (event) => {
+  if (event.data.source !== 'ai-aggregator') return; // 验证来源
+  
+  switch(event.data.action) {
+    case 'someAction':
+      handleAction(event.data);
+      break;
+  }
+});
+```
+
+## 异步操作
+
+所有异步操作都应该有错误处理：
+
+```javascript
+// ✅ 正确
+try {
+  const result = await chrome.storage.sync.get(['key']);
+  // 处理结果
+} catch (error) {
+  console.error('操作失败:', error);
+  showNotification('操作失败: ' + error.message, 'error');
+}
+
+// ❌ 错误 - 没有错误处理
+const result = await chrome.storage.sync.get(['key']);
+```
+
+## 日志和调试
+
+在关键路径上添加详细日志：
+
+```javascript
+console.log('函数名: 关键操作描述', 相关数据);
+console.log('tab-selector: 准备保存的网站数据:', sites);
+console.log('split-view: 时间差:', timeDiff, 'ms');
+
+// 错误日志
+if (!element) {
+  console.error('未找到元素:', selector);
+  return;
+}
+```

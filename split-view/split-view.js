@@ -1,6 +1,11 @@
 // 分屏视图脚本
+const SPLIT_SITES_KEY = 'currentSplitSites';
+const LAYOUT_KEY = 'currentSplitLayout';
+
 let aiSites = [];
 let currentLayout = '4-grid';
+let availableTabsCache = [];
+let isFetchingTabs = false;
 
 // 页面加载完成
 document.addEventListener('DOMContentLoaded', async () => {
@@ -17,47 +22,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   hideLoading();
   
   showNotification('分屏视图已加载，准备就绪！', 2000);
+  await refreshAvailableTabs();
 });
 
 // 加载配置
 async function loadConfig() {
   return new Promise((resolve) => {
     console.log('split-view: 开始加载配置...');
-    // 优先从tab-selector传递的数据加载
-    chrome.storage.local.get(['selectedSitesForSplit', 'splitViewTimestamp'], (localResult) => {
-      console.log('split-view: local storage数据:', localResult);
-      const now = Date.now();
-      const timeDiff = localResult.splitViewTimestamp ? (now - localResult.splitViewTimestamp) : null;
-      console.log('split-view: 时间差:', timeDiff, 'ms');
-      
-      // 如果是最近（5秒内）从tab-selector过来的，使用传递的数据
-      if (localResult.selectedSitesForSplit && 
-          localResult.splitViewTimestamp && 
-          (now - localResult.splitViewTimestamp < 5000)) {
-        aiSites = localResult.selectedSitesForSplit;
-        console.log('split-view: 使用tab-selector传递的数据:', aiSites);
-        // 将当前分屏站点写入local，便于其他页面（如选择器配置）读取
-        chrome.storage.local.set({
-          currentSplitSites: aiSites,
-          currentSplitTimestamp: Date.now()
-        });
-        // 清除临时数据
-        chrome.storage.local.remove(['selectedSitesForSplit', 'splitViewTimestamp']);
-        resolve();
-      } else {
-        console.log('split-view: tab-selector数据过期或不存在，从sync storage加载');
-        // 否则从sync storage加载
-        chrome.storage.sync.get(['aiSites'], (result) => {
-          aiSites = (result.aiSites || []).filter(site => site.enabled);
-          console.log('split-view: 从sync storage加载的数据:', aiSites);
-          // 同步当前分屏站点到local
+    chrome.storage.local.get(['selectedSitesForSplit'], (localResult) => {
+      const selectedSites = Array.isArray(localResult.selectedSitesForSplit) ? localResult.selectedSitesForSplit : null;
+      if (selectedSites && selectedSites.length > 0) {
+        console.log('split-view: 采用tab-selector传递的新站点:', selectedSites);
+        aiSites = selectedSites;
+        chrome.storage.sync.set({ [SPLIT_SITES_KEY]: aiSites }, () => {
+          chrome.storage.local.remove(['selectedSitesForSplit']);
           chrome.storage.local.set({
             currentSplitSites: aiSites,
             currentSplitTimestamp: Date.now()
           });
-          resolve();
+          chrome.storage.sync.get([LAYOUT_KEY], (layoutResult) => {
+            if (typeof layoutResult[LAYOUT_KEY] === 'string') {
+              currentLayout = layoutResult[LAYOUT_KEY];
+            }
+            resolve();
+          });
         });
+        return;
       }
+
+      chrome.storage.sync.get([SPLIT_SITES_KEY, LAYOUT_KEY], (result) => {
+        aiSites = Array.isArray(result[SPLIT_SITES_KEY]) ? result[SPLIT_SITES_KEY] : [];
+        currentLayout = typeof result[LAYOUT_KEY] === 'string' ? result[LAYOUT_KEY] : currentLayout;
+        chrome.storage.local.set({
+          currentSplitSites: aiSites,
+          currentSplitTimestamp: Date.now()
+        });
+        resolve();
+      });
     });
   });
 }
@@ -78,20 +79,14 @@ function initializeSplitView() {
     return;
   }
   
-  // 限制显示数量（根据布局）
-  const maxSites = getMaxSitesForLayout(currentLayout);
-  const sitesToShow = aiSites.slice(0, maxSites);
-  
-  sitesToShow.forEach((site, index) => {
+  // 显示所有选中的网站，不限制数量
+  aiSites.forEach((site, index) => {
     const panel = createIframePanel(site, index);
     container.appendChild(panel);
   });
   
-  // 如果站点数少于布局格子数，填充空面板
-  for (let i = sitesToShow.length; i < maxSites; i++) {
-    const emptyPanel = createEmptyPanel(i);
-    container.appendChild(emptyPanel);
-  }
+  // 动态调整布局以适应网站数量
+  adjustLayoutForSiteCount(aiSites.length);
 }
 
 // 显示空状态引导
@@ -137,16 +132,48 @@ function showEmptyGuide() {
   });
 }
 
-// 根据布局获取最大站点数
-function getMaxSitesForLayout(layout) {
-  const layoutMap = {
-    '2-horizontal': 2,
-    '2-vertical': 2,
-    '3-horizontal': 3,
-    '3-grid': 3,
-    '4-grid': 4
-  };
-  return layoutMap[layout] || 4;
+// 动态调整布局以适应网站数量
+function adjustLayoutForSiteCount(count) {
+  const container = document.getElementById('splitContainer');
+  const layoutSelector = document.getElementById('layoutSelector');
+  
+  // 根据数量自动推荐布局
+  let recommendedLayout = currentLayout;
+  
+  if (count <= 2) {
+    recommendedLayout = '2-horizontal';
+  } else if (count === 3) {
+    recommendedLayout = '3-horizontal';
+  } else if (count === 4) {
+    recommendedLayout = '4-grid';
+  } else {
+    // 超过4个网站，使用自动布局（支持任意数量的网站）
+    recommendedLayout = 'auto-grid';
+    // 为了保持每个iframe有合理的宽度，最多显示4列，超过的网站会换行到下一行
+    const cols = Math.min(Math.ceil(Math.sqrt(count)), 4);
+    const rows = Math.ceil(count / cols);
+    container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+    
+    console.log(`自动布局: ${count}个网站 -> ${cols}列 x ${rows}行`);
+  }
+  
+  // 如果是预设布局，应用CSS类
+  if (['2-horizontal', '2-vertical', '3-horizontal', '3-grid', '4-grid'].includes(recommendedLayout)) {
+    container.className = `split-container layout-${recommendedLayout}`;
+    container.style.gridTemplateColumns = '';
+    container.style.gridTemplateRows = '';
+  } else if (recommendedLayout === 'auto-grid') {
+    container.className = 'split-container';
+  }
+  
+  // 更新当前布局变量
+  currentLayout = recommendedLayout;
+  
+  // 更新布局选择器
+  if (layoutSelector) {
+    layoutSelector.value = recommendedLayout;
+  }
 }
 
 // 创建iframe面板
@@ -181,8 +208,15 @@ function createIframePanel(site, index) {
   openBtn.title = '在新标签页打开';
   openBtn.onclick = () => chrome.tabs.create({ url: site.url });
   
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'panel-btn';
+  closeBtn.textContent = '✕';
+  closeBtn.title = '关闭此面板';
+  closeBtn.onclick = () => removeSite(site.id);
+
   actions.appendChild(refreshBtn);
   actions.appendChild(openBtn);
+  actions.appendChild(closeBtn);
   
   header.appendChild(title);
   header.appendChild(actions);
@@ -194,12 +228,17 @@ function createIframePanel(site, index) {
   // 创建iframe - 现在可以成功加载！
   const iframe = document.createElement('iframe');
   iframe.src = site.url;
-  iframe.sandbox = 'allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation';
-  iframe.allow = 'camera; microphone; geolocation';
+  // 添加 allow-storage-access-by-user-activation 以允许在iframe中访问cookies
+  iframe.sandbox = 'allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation allow-storage-access-by-user-activation allow-modals';
+  iframe.allow = 'camera; microphone; geolocation; storage-access';
   
   // 添加加载事件监听
   iframe.addEventListener('load', () => {
     console.log(`${site.name} 加载成功`);
+    // 延迟检查是否有登录问题提示
+    setTimeout(() => {
+      checkIframeLoginStatus(iframe, iframeContainer, site);
+    }, 2000);
   });
   
   iframe.addEventListener('error', (e) => {
@@ -225,10 +264,17 @@ function createEmptyPanel(index) {
   placeholder.innerHTML = `
     <div class="placeholder-icon">➕</div>
     <div class="placeholder-text">空闲位置</div>
-    <div class="placeholder-hint">在设置中启用更多AI网站</div>
-    <button class="placeholder-btn" onclick="openSettings()">打开设置</button>
+    <div class="placeholder-hint">从标签页选择添加更多网站</div>
   `;
   
+  const addBtn = document.createElement('button');
+  addBtn.className = 'placeholder-btn';
+  addBtn.textContent = '去选择网站';
+  addBtn.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('tab-selector/tab-selector.html') });
+  });
+  
+  placeholder.appendChild(addBtn);
   panel.appendChild(placeholder);
   return panel;
 }
@@ -242,10 +288,15 @@ function showPlaceholder(container, site) {
     <div class="placeholder-icon">🔒</div>
     <div class="placeholder-text">${site.name} 无法在iframe中加载</div>
     <div class="placeholder-hint">该网站限制了iframe嵌入</div>
-    <button class="placeholder-btn" onclick="chrome.tabs.create({ url: '${site.url}' })">
-      在新标签页打开
-    </button>
   `;
+
+  const openBtn = document.createElement('button');
+  openBtn.className = 'placeholder-btn';
+  openBtn.textContent = '在新标签页打开';
+  openBtn.addEventListener('click', () => {
+    chrome.tabs.create({ url: site.url });
+  });
+  placeholder.appendChild(openBtn);
   container.appendChild(placeholder);
 }
 
@@ -288,6 +339,13 @@ function bindEvents() {
   // 布局选择器
   document.getElementById('layoutSelector').addEventListener('change', (e) => {
     changeLayout(e.target.value);
+  });
+  document.getElementById('addSiteBtn').addEventListener('click', openAddSitePanel);
+  document.getElementById('closeAddSite').addEventListener('click', closeAddSitePanel);
+  document.getElementById('addSiteBackdrop').addEventListener('click', closeAddSitePanel);
+  document.getElementById('refreshAvailableTabs').addEventListener('click', refreshAvailableTabs);
+  document.getElementById('openTabSelectorFromAdd').addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('tab-selector/tab-selector.html') });
   });
   
   // 设置按钮
@@ -379,12 +437,31 @@ async function sendToAllAI() {
 function changeLayout(layout) {
   currentLayout = layout;
   const container = document.getElementById('splitContainer');
-  container.className = `split-container layout-${layout}`;
   
-  // 重新初始化面板
-  initializeSplitView();
+  if (layout === 'auto-grid') {
+    // 自动布局 - 根据网站数量自动计算
+    adjustLayoutForSiteCount(aiSites.length);
+  } else {
+    // 预设布局 - 应用CSS类
+    container.style.gridTemplateColumns = '';
+    container.style.gridTemplateRows = '';
+    container.className = `split-container layout-${layout}`;
+  }
   
   showNotification(`已切换到 ${getLayoutName(layout)} 布局`, 2000);
+  saveCurrentLayout();
+}
+
+function saveCurrentState() {
+  chrome.storage.local.set({
+    currentSplitSites: aiSites,
+    currentSplitTimestamp: Date.now()
+  });
+  chrome.storage.sync.set({ [SPLIT_SITES_KEY]: aiSites });
+}
+
+function saveCurrentLayout() {
+  chrome.storage.sync.set({ [LAYOUT_KEY]: currentLayout });
 }
 
 // 获取布局名称
@@ -394,7 +471,8 @@ function getLayoutName(layout) {
     '2-vertical': '2列纵向',
     '3-horizontal': '3列横向',
     '3-grid': '3宫格',
-    '4-grid': '4宫格'
+    '4-grid': '4宫格',
+    'auto-grid': '自动布局'
   };
   return names[layout] || layout;
 }
@@ -455,8 +533,8 @@ async function loadAISitesSettings() {
 // 获取所有站点
 async function getAllSites() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(['aiSites'], (result) => {
-      resolve(result.aiSites || getDefaultSites());
+    chrome.storage.sync.get([SPLIT_SITES_KEY], (result) => {
+      resolve(result[SPLIT_SITES_KEY] || []);
     });
   });
 }
@@ -467,13 +545,182 @@ async function toggleSite(siteId, enabled) {
   const site = sites.find(s => s.id === siteId);
   if (site) {
     site.enabled = enabled;
-    chrome.storage.sync.set({ aiSites: sites }, async () => {
-      await loadConfig();
-      initializeSplitView();
-      showNotification(`${site.name} 已${enabled ? '启用' : '禁用'}`, 2000);
-    });
+    const updatedSites = sites;
+    aiSites = updatedSites;
+    await chrome.storage.sync.set({ [SPLIT_SITES_KEY]: updatedSites });
+    saveCurrentState();
+    initializeSplitView();
+    showNotification(`${site.name} 已${enabled ? '启用' : '禁用'}`, 2000);
   }
 }
+
+// 移除站点
+async function removeSite(siteId) {
+  const sites = await getAllSites();
+  const index = sites.findIndex(s => s.id === siteId);
+  if (index === -1) {
+    console.warn('removeSite: 未找到站点', siteId);
+    return;
+  }
+
+  const removedSite = sites[index];
+  const updatedSites = sites.filter(s => s.id !== siteId);
+
+  await chrome.storage.sync.set({ [SPLIT_SITES_KEY]: updatedSites });
+  aiSites = updatedSites;
+  saveCurrentState();
+  initializeSplitView();
+  adjustLayoutForSiteCount(aiSites.length);
+  renderAvailableTabs();
+  showNotification(`${removedSite.name} 已从分屏中移除`, 2000);
+}
+
+// 打开添加网站面板
+function openAddSitePanel() {
+  document.getElementById('addSitePanel').classList.remove('hidden');
+  document.getElementById('addSiteBackdrop').classList.remove('hidden');
+  renderAvailableTabs();
+}
+
+// 关闭添加网站面板
+function closeAddSitePanel() {
+  document.getElementById('addSitePanel').classList.add('hidden');
+  document.getElementById('addSiteBackdrop').classList.add('hidden');
+}
+
+// 刷新可添加的标签页
+async function refreshAvailableTabs() {
+  if (isFetchingTabs) {
+    console.log('refreshAvailableTabs: 正在刷新，忽略重复请求');
+    return;
+  }
+  isFetchingTabs = true;
+  try {
+    console.log('refreshAvailableTabs: 开始获取标签页');
+    const tabs = await chrome.tabs.query({});
+    availableTabsCache = tabs.filter(tab =>
+      tab.url &&
+      (tab.url.startsWith('http://') || tab.url.startsWith('https://')) &&
+      !tab.url.includes('chrome://') &&
+      !tab.url.includes('chrome-extension://')
+    );
+    console.log('refreshAvailableTabs: 获取到有效标签页数量', availableTabsCache.length);
+    renderAvailableTabs();
+  } catch (error) {
+    console.error('refreshAvailableTabs: 获取标签页失败', error);
+    showNotification('刷新标签页失败: ' + error.message, 3000);
+  } finally {
+    isFetchingTabs = false;
+  }
+}
+
+// 渲染可添加标签页列表
+function renderAvailableTabs() {
+  const list = document.getElementById('availableTabsList');
+  if (!list) {
+    return;
+  }
+
+  list.innerHTML = '';
+
+  const loading = document.createElement('div');
+  loading.style.cssText = 'text-align: center; padding: 12px; color: #888; font-size: 13px;';
+  loading.textContent = '正在加载可用标签页...';
+
+  if (isFetchingTabs) {
+    list.appendChild(loading);
+    return;
+  }
+
+  if (availableTabsCache.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'text-align: center; padding: 24px; color: #666;';
+    empty.textContent = '没有可用的标签页，请先打开你想要添加的网站。';
+    list.appendChild(empty);
+    return;
+  }
+
+  availableTabsCache.forEach(tab => {
+    const url = new URL(tab.url);
+    const siteId = url.hostname.replace(/[^a-zA-Z0-9]/g, '_');
+    const alreadyAdded = aiSites.some(site => site.id === siteId || site.url === tab.url);
+
+    const item = document.createElement('div');
+    item.className = 'available-tab-item';
+
+    const iconWrapper = document.createElement('div');
+    iconWrapper.className = 'available-tab-icon';
+    const iconImg = document.createElement('img');
+    iconImg.src = tab.favIconUrl || `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`;
+    iconImg.alt = '';
+    iconImg.style.width = '100%';
+    iconImg.style.height = '100%';
+    iconImg.onerror = () => {
+      iconWrapper.textContent = '🌐';
+      iconImg.remove();
+    };
+    iconWrapper.appendChild(iconImg);
+
+    const info = document.createElement('div');
+    info.className = 'available-tab-info';
+    const title = document.createElement('div');
+    title.className = 'available-tab-title';
+    title.textContent = tab.title || url.hostname;
+    const subtitle = document.createElement('div');
+    subtitle.className = 'available-tab-url';
+    subtitle.textContent = url.origin;
+    info.appendChild(title);
+    info.appendChild(subtitle);
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-tab-btn';
+    addBtn.textContent = alreadyAdded ? '已添加' : '添加';
+    addBtn.disabled = alreadyAdded;
+    addBtn.addEventListener('click', () => addTabToSplit(tab));
+
+    item.appendChild(iconWrapper);
+    item.appendChild(info);
+    item.appendChild(addBtn);
+    list.appendChild(item);
+  });
+}
+
+// 添加标签页到分屏
+async function addTabToSplit(tab) {
+  try {
+    const url = new URL(tab.url);
+    const siteId = url.hostname.replace(/[^a-zA-Z0-9]/g, '_');
+
+    const sites = await getAllSites();
+    const candidate = {
+      id: siteId,
+      name: tab.title || url.hostname,
+      url: tab.url,
+      hostname: url.hostname,
+      enabled: true
+    };
+
+    const existingIndex = sites.findIndex(site => site.id === siteId);
+    let updatedSites;
+    if (existingIndex >= 0) {
+      updatedSites = sites.map((site, index) => index === existingIndex ? { ...candidate } : site);
+    } else {
+      updatedSites = [...sites, candidate];
+    }
+
+    await chrome.storage.sync.set({ [SPLIT_SITES_KEY]: updatedSites });
+    aiSites = updatedSites;
+    saveCurrentState();
+    initializeSplitView();
+    adjustLayoutForSiteCount(aiSites.length);
+    renderAvailableTabs();
+    showNotification('已添加至分屏: ' + (tab.title || url.hostname), 2000);
+  } catch (error) {
+    console.error('addTabToSplit: 添加失败', error);
+    showNotification('添加失败: ' + error.message, 3000);
+  }
+}
+
 
 // 显示通知
 function showNotification(message, duration = 3000) {
@@ -489,6 +736,56 @@ function showNotification(message, duration = 3000) {
 // 隐藏加载遮罩
 function hideLoading() {
   document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+// 检查iframe登录状态
+function checkIframeLoginStatus(iframe, container, site) {
+  try {
+    // 由于跨域限制，我们无法直接访问iframe内容
+    // 但我们可以检查iframe是否成功加载
+    if (!iframe.contentWindow) {
+      console.warn(`${site.name}: iframe contentWindow不可访问`);
+      showLoginWarning(container, site);
+    }
+  } catch (e) {
+    // 跨域错误是正常的，说明iframe已加载
+    console.log(`${site.name}: 跨域iframe（正常）`);
+  }
+}
+
+// 显示登录提示
+function showLoginWarning(container, site) {
+  // 检查是否已经有警告提示
+  if (container.querySelector('.login-warning')) {
+    return;
+  }
+  
+  const warning = document.createElement('div');
+  warning.className = 'login-warning';
+  
+  const content = document.createElement('div');
+  content.className = 'warning-content';
+  
+  const icon = document.createElement('span');
+  icon.className = 'warning-icon';
+  icon.textContent = '⚠️';
+  content.appendChild(icon);
+  
+  const text = document.createElement('span');
+  text.className = 'warning-text';
+  text.textContent = '如果需要登录，建议使用右上角 ↗ 按钮在新标签页处理登录';
+  content.appendChild(text);
+  
+  const button = document.createElement('button');
+  button.className = 'warning-btn';
+  button.textContent = '↗ 新标签页';
+  button.addEventListener('click', () => {
+    chrome.tabs.create({ url: site.url });
+  });
+  content.appendChild(button);
+  
+  warning.appendChild(content);
+  container.appendChild(warning);
 }
 
 // 使函数全局可用

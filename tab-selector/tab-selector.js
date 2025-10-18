@@ -1,7 +1,6 @@
 // 标签页选择器
 let allTabs = [];
 let selectedTabs = [];
-const MAX_SELECTION = 4;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadTabs();
@@ -95,11 +94,7 @@ function toggleTab(tab, card) {
     selectedTabs.splice(index, 1);
     card.classList.remove('selected');
   } else {
-    // 未选择，检查是否超过限制
-    if (selectedTabs.length >= MAX_SELECTION) {
-      showNotification(`最多只能选择 ${MAX_SELECTION} 个网站`, 'warning');
-      return;
-    }
+    // 未选择，直接添加（不限制数量）
     selectedTabs.push(tab);
     card.classList.add('selected');
   }
@@ -123,8 +118,7 @@ function bindEvents() {
   
   // 全选按钮
   document.getElementById('selectAllBtn').addEventListener('click', () => {
-    const toSelect = allTabs.slice(0, MAX_SELECTION);
-    selectedTabs = [...toSelect];
+    selectedTabs = [...allTabs];
     
     document.querySelectorAll('.tab-card').forEach(card => {
       const tabId = parseInt(card.dataset.tabId);
@@ -173,11 +167,12 @@ async function startSplitView() {
     console.log('tab-selector: 准备保存的网站数据:', sites);
     await chrome.storage.local.set({ 
       selectedSitesForSplit: sites,
-      splitViewTimestamp: Date.now(),
       currentSplitSites: sites,
       currentSplitTimestamp: Date.now()
     });
     console.log('tab-selector: 数据已保存到storage.local');
+
+    await chrome.storage.sync.set({ currentSplitSites: sites });
     
     // 打开分屏视图
     chrome.tabs.create({ 

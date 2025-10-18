@@ -1,0 +1,83 @@
+---
+globs: manifest.json
+description: Chrome扩展manifest.json配置规范
+---
+
+# Manifest.json 配置规范
+
+参考文件：[manifest.json](mdc:manifest.json)
+
+## 关键配置
+
+### Permissions
+必须包含以下权限：
+```json
+{
+  "permissions": [
+    "storage",           // 数据持久化
+    "tabs",              // 获取和管理标签页
+    "scripting",         // 动态注入脚本
+    "declarativeNetRequest",  // 修改网络请求头
+    "declarativeNetRequestWithHostAccess"  // 带主机访问权限
+  ]
+}
+```
+
+### Declarative Net Request
+用于移除X-Frame-Options限制，实现iframe嵌入：
+
+```json
+{
+  "declarative_net_request": {
+    "rule_resources": [{
+      "id": "remove_headers",
+      "enabled": true,
+      "path": "rules.json"
+    }]
+  }
+}
+```
+
+配套的[rules.json](mdc:rules.json)文件必须包含移除响应头的规则。
+
+### Content Scripts
+必须使用`<all_urls>`以支持所有网站：
+
+```json
+{
+  "content_scripts": [{
+    "matches": ["<all_urls>"],  // ✅ 使用通配符，不硬编码
+    "js": ["content-scripts/iframe-injector.js"],
+    "all_frames": true  // 关键！让脚本在iframe中运行
+  }]
+}
+```
+
+### ❌ 错误做法
+硬编码特定网站：
+```json
+{
+  "content_scripts": [{
+    "matches": [
+      "https://chatgpt.com/*",
+      "https://gemini.google.com/*"
+    ]
+  }]
+}
+```
+
+## Host Permissions
+如果需要访问特定域名，使用`host_permissions`：
+
+```json
+{
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}
+```
+
+## 注意事项
+1. **不要硬编码网站域名** - 使用`<all_urls>`
+2. **content_scripts必须设置all_frames: true** - 否则无法在iframe中运行
+3. **declarativeNetRequest是关键** - 没有它iframe无法加载大部分网站

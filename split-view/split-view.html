@@ -7,7 +7,12 @@
   <link rel="stylesheet" href="split-view.css">
 </head>
 <body>
-  <!-- 顶部控制栏 -->
+  <!-- 分屏容器 -->
+  <div id="splitContainer" class="split-container layout-4-grid">
+    <!-- 动态生成iframe -->
+  </div>
+
+  <!-- 控制栏 -->
   <div class="control-bar">
     <div class="logo">
       <span class="logo-icon">🤖</span>
@@ -32,17 +37,14 @@
         <option value="3-horizontal">3列横向</option>
         <option value="3-grid">3宫格</option>
         <option value="4-grid" selected>4宫格</option>
+        <option value="auto-grid">自动布局</option>
       </select>
+      <button id="addSiteBtn" class="icon-btn" title="添加网站">➕</button>
       <button id="configBtn" class="icon-btn" title="配置选择器">🎯</button>
       <button id="settingsBtn" class="icon-btn" title="设置">⚙️</button>
       <button id="refreshBtn" class="icon-btn" title="刷新所有">🔄</button>
       <button id="fullscreenBtn" class="icon-btn" title="全屏">⛶</button>
     </div>
-  </div>
-
-  <!-- 分屏容器 -->
-  <div id="splitContainer" class="split-container layout-4-grid">
-    <!-- 动态生成iframe -->
   </div>
 
   <!-- 设置面板 -->
@@ -58,6 +60,24 @@
       <button id="openMainPanel" class="btn btn-primary">📱 打开高级控制面板</button>
     </div>
   </div>
+
+  <!-- 添加网站面板 -->
+  <div id="addSitePanel" class="add-site-panel hidden">
+    <div class="add-site-header">
+      <h2>添加网站到分屏</h2>
+      <button id="closeAddSite" class="close-btn">✕</button>
+    </div>
+    <div class="add-site-content">
+      <div class="add-site-toolbar">
+        <button id="refreshAvailableTabs" class="toolbar-btn">🔄 刷新标签页</button>
+        <button id="openTabSelectorFromAdd" class="toolbar-btn">🌐 打开标签页选择器</button>
+      </div>
+      <div id="availableTabsList" class="available-tabs-list">
+        <!-- 动态生成列表 -->
+      </div>
+    </div>
+  </div>
+  <div id="addSiteBackdrop" class="panel-backdrop hidden"></div>
 
   <!-- 加载提示 -->
   <div id="loadingOverlay" class="loading-overlay">

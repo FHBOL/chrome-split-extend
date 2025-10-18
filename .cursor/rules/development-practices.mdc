@@ -1,0 +1,103 @@
+---
+description: 多AI对话聚合器开发最佳实践和编码规范
+---
+
+# 开发最佳实践
+
+## 1. 调试策略
+
+始终添加详细的console.log以便追踪问题：
+
+```javascript
+// 添加详细的console.log
+console.log('tab-selector: 准备保存的网站数据:', sites);
+console.log('split-view: 时间差:', timeDiff, 'ms');
+
+// 在关键路径上检查
+if (!element) {
+  console.error('未找到元素:', selector);
+  return;
+}
+```
+
+## 2. 用户体验优先
+
+- ✅ 空状态时显示引导而非空白
+- ✅ 操作失败时给出明确提示
+- ✅ 提供"刷新"按钮而非要求用户手动刷新
+- ✅ 显示实时计数和状态
+
+## 3. 数据存储
+
+```javascript
+// 临时数据用local（带时间戳）
+chrome.storage.local.set({ 
+  data: value,
+  timestamp: Date.now()
+});
+
+// 持久配置用sync
+chrome.storage.sync.set({ 
+  aiSites: sites
+});
+```
+
+## 4. 错误处理
+
+所有异步操作都应该有错误处理：
+
+```javascript
+try {
+  await someOperation();
+} catch (error) {
+  console.error('操作失败:', error);
+  showNotification('操作失败: ' + error.message, 'error');
+}
+```
+
+## 功能清单
+
+### ✅ 已实现
+1. 从标签页动态选择网站（无硬编码）
+2. 在一个标签页内分屏显示（使用iframe + declarativeNetRequest）
+3. 统一输入框向所有AI发送消息（postMessage + content script）
+4. 可视化配置选择器（element-picker）
+5. 多种布局支持（2列、3列、4宫格、自动布局等）
+6. 空状态引导
+7. 实时刷新标签页列表
+8. 配置持久化
+9. 无网站数量限制（支持任意数量）
+
+### 🚧 待优化
+1. 支持iframe大小调整
+2. 支持拖拽排序
+3. 历史对话记录对比
+4. 快捷键支持
+5. 导出对话功能
+6. 更智能的选择器自动识别
+7. 性能优化（懒加载iframe）
+
+### ❌ 已废弃
+1. 硬编码的AI网站列表
+2. 自动填充测试文字（改为手动输入）
+3. 复杂的反爬虫对策（保持简单）
+4. 4个网站的数量限制（已移除）
+
+## 总结经验
+
+### 技术突破
+1. 使用declarativeNetRequest绕过X-Frame-Options是关键突破
+2. postMessage + content script实现跨iframe通信
+3. 时间戳验证确保数据新鲜度
+
+### 用户体验
+1. 从标签页选择比硬编码更灵活
+2. 可视化元素选择比手写CSS选择器更友好
+3. 空状态引导比空白页面更好
+
+### 避免的坑
+1. 不要依赖自动填充（引导用户手动输入更可靠）
+2. 不要只阻止click（要阻止mousedown/mouseup）
+3. 不要使用硬编码（完全动态化）
+4. 不要忘记清理临时数据（防止内存泄漏）
+5. 不要限制网站数量（让用户自己决定）

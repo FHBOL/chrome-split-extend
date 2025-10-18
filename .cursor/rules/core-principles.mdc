@@ -1,0 +1,110 @@
+---
+alwaysApply: true
+description: 多AI对话聚合器项目的核心原则和架构设计
+---
+
+# 多AI对话聚合器 - 核心原则
+
+## 项目概述
+Chrome浏览器扩展，允许用户从已打开的标签页中选择网站进行分屏显示，并支持统一输入功能。
+
+## 🚨 核心原则（必须遵守）
+
+### 1. 绝对禁止硬编码
+- ❌ 禁止在任何地方硬编码网站列表、域名、URL
+- ❌ 禁止在[manifest.json](mdc:manifest.json)中硬编码content_scripts的matches（使用`<all_urls>`）
+- ❌ 禁止在代码中硬编码选择器
+- ✅ 一切配置从用户选择或存储中动态读取
+- ✅ 支持用户添加任意网站
+
+### 2. 完全动态化
+- 网站列表：从已打开的标签页动态获取
+- 选择器：用户通过可视化工具配置
+- Content Scripts：使用`<all_urls>`注入到所有页面
+- 功能：自动适配用户选择的任何网站
+
+## 核心架构
+
+### 主要组件
+- **tab-selector**: 从已打开标签页选择要分屏的网站 [tab-selector.js](mdc:tab-selector/tab-selector.js)
+- **split-view**: 使用iframe在一个标签页内分屏显示多个网站 [split-view.js](mdc:split-view/split-view.js)
+- **selector-config**: 可视化配置AI网站的输入框和发送按钮选择器 [selector-config.js](mdc:selector-config/selector-config.js)
+- **window-manager**: 备用方案，使用窗口API排列 [window-manager.js](mdc:window-manager/window-manager.js)
+- **element-picker**: 注入到目标网站的元素选择工具 [element-picker.js](mdc:selector-config/element-picker.js)
+
+### 关键技术
+- **declarativeNetRequest API**: 移除X-Frame-Options限制，实现iframe嵌入（见[rules.json](mdc:rules.json)）
+- **postMessage**: 跨iframe通信，实现统一发送
+- **chrome.storage.local/sync**: 数据持久化
+- **chrome.tabs API**: 获取和管理标签页
+- **Content Scripts**: 操作网页DOM（见[iframe-injector.js](mdc:content-scripts/iframe-injector.js)）
+
+## 重要设计决策
+
+### 1. 完全移除硬编码
+
+❌ **错误做法**：预设AI网站列表
+```javascript
+const DEFAULT_AI_SITES = [
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/' },
+  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/' }
+];
+```
+
+✅ **正确做法**：从标签页动态获取
+```javascript
+const tabs = await chrome.tabs.query({});
+const validTabs = tabs.filter(tab => 
+  tab.url && tab.url.startsWith('http') && 
+  !tab.url.includes('chrome://')
+);
+```
+
+### 2. 数据传递机制
+
+**tab-selector → split-view**:
+```javascript
+// tab-selector保存临时数据
+await chrome.storage.local.set({ 
+  selectedSitesForSplit: sites,
+  splitViewTimestamp: Date.now()
+});
+
+// split-view读取（5秒内有效）
+if (localResult.selectedSitesForSplit && 
+    Date.now() - localResult.splitViewTimestamp < 5000) {
+  aiSites = localResult.selectedSitesForSplit;
+}
+```
+
+### 3. 跨iframe通信
+
+**父页面发送** (在[split-view.js](mdc:split-view/split-view.js)中):
+```javascript
+iframe.contentWindow.postMessage({
+  action: 'fillAndSend',
+  text: text,
+  source: 'ai-aggregator'
+}, '*');
+```
+
+**iframe内部接收** (在[iframe-injector.js](mdc:content-scripts/iframe-injector.js)中):
+```javascript
+window.addEventListener('message', (event) => {
+  if (event.data.action === 'fillAndSend' && 
+      event.data.source === 'ai-aggregator') {
+    fillInput(element, event.data.text);
+    clickSendButton();
+  }
+});
+```
+
+## 注意事项
+
+1. **不要硬编码**：任何网站列表都应该动态生成
+2. **事件阻止要彻底**：mousedown/mouseup/click都要阻止
+3. **跨iframe通信要验证来源**：检查source标识
+4. **数据传递要加时间戳**：防止脏数据
+5. **空状态要友好**：引导用户而非显示空白
+6. **调试日志要详细**：关键路径必须有日志
+7. **用户操作要有反馈**：加载中/成功/失败都要提示

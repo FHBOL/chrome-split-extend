@@ -1,0 +1,92 @@
+---
+description: 多AI对话聚合器常见问题和解决方案
+---
+
+# 常见问题和解决方案
+
+## 问题1: iframe无法加载网站
+
+**原因**: X-Frame-Options和CSP限制
+
+**解决**: 使用declarativeNetRequest API
+
+在[rules.json](mdc:rules.json)中配置：
+```json
+{
+  "action": {
+    "type": "modifyHeaders",
+    "responseHeaders": [
+      { "header": "x-frame-options", "operation": "remove" },
+      { "header": "content-security-policy", "operation": "remove" }
+    ]
+  },
+  "condition": {
+    "resourceTypes": ["sub_frame"]
+  }
+}
+```
+
+## 问题2: 无法向AI输入框填充内容
+
+**原因**: 
+1. 网站使用contentEditable而非textarea
+2. 网站监听特定事件（不只是input）
+3. 反爬虫机制检测isTrusted
+
+**解决**: 多种方法组合（在[iframe-injector.js](mdc:content-scripts/iframe-injector.js)中实现）
+```javascript
+// 1. 先聚焦
+element.focus();
+element.click();
+
+// 2. 多种填充方式
+element.value = text; // textarea
+element.textContent = text; // contentEditable
+element.innerHTML = text;
+
+// 3. 触发多种事件
+element.dispatchEvent(new Event('input', { bubbles: true }));
+element.dispatchEvent(new InputEvent('input', { inputType: 'insertText' }));
+element.dispatchEvent(new Event('keyup', { bubbles: true }));
+```
+
+## 问题3: 选择发送按钮时误触发发送
+
+**原因**: 网站监听mousedown/mouseup而非click
+
+**解决**: 在捕获阶段阻止所有鼠标事件（在[element-picker.js](mdc:selector-config/element-picker.js)中实现）
+```javascript
+document.addEventListener('mousedown', handleMouseDown, true);
+document.addEventListener('mouseup', handleMouseUp, true);
+document.addEventListener('click', handleClick, true);
+
+function handleClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation(); // 关键！阻止同元素的其他监听器
+}
+```
+
+## 问题4: Gemini等网站使用Quill编辑器无法输入
+
+**原因**: Quill编辑器有自己的事件系统
+
+**解决**: 尝试直接操作Quill实例
+```javascript
+const quillContainer = element.closest('.ql-container');
+if (quillContainer && quillContainer.__quill) {
+  quillContainer.__quill.setText(text);
+}
+```
+
+## 问题5: split-view显示空白
+
+**原因**: 没有数据源（删除硬编码后）
+
+**解决**: 显示引导界面（在[split-view.js](mdc:split-view/split-view.js)中实现）
+```javascript
+if (aiSites.length === 0) {
+  showEmptyGuide(); // 引导用户使用tab-selector
+  return;
+}
+```
