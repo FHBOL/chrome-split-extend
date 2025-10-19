@@ -249,14 +249,22 @@ body {
   display: inline-block;
 }
 
-.ai-status.configured {
-  background: #28a745;
-  color: white;
+.ai-status.user-configured {
+  background: #e8f5e9;
+  color: #388e3c;
+  font-weight: 500;
+}
+
+.ai-status.preset-configured {
+  background: #e3f2fd;
+  color: #1976d2;
+  font-weight: 500;
 }
 
 .ai-status.not-configured {
-  background: #ffc107;
-  color: #000;
+  background: #fff3cd;
+  color: #856404;
+  font-weight: 500;
 }
 
 /* 当前网站信息 */
@@ -552,6 +560,30 @@ body {
   font-weight: 600;
   color: #333;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 配置来源徽章 */
+.config-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.config-badge.preset {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.config-badge.user {
+  background: #e8f5e9;
+  color: #388e3c;
 }
 
 .configured-item-selectors {
@@ -576,5 +608,38 @@ body {
 
 .btn-icon:hover {
   background: rgba(0, 0, 0, 0.05);
+}
+
+/* 重置通知 */
+.reset-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #28a745;
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 10000;
+  animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
 }
 

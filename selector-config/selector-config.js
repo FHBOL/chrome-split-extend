@@ -123,11 +123,28 @@ async function renderAIList() {
       // 生成唯一ID（基于hostname）
       const siteId = hostname.replace(/[^a-zA-Z0-9]/g, '_');
       
-      // 检查是否已配置（支持旧键名迁移后的匹配）
-      const isConfigured = !!allConfigs[siteId];
+      // 检查配置状态：用户配置 > 预设配置 > 未配置
+      const userConfig = allConfigs[siteId];
+      const presetConfig = typeof DEFAULT_CONFIGS !== 'undefined' ? DEFAULT_CONFIGS[siteId] : null;
+      
+      let statusHTML, statusClass;
+      
+      if (userConfig) {
+        // 有用户自定义配置
+        statusHTML = '✓ 已自定义';
+        statusClass = 'user-configured';
+      } else if (presetConfig) {
+        // 有预设配置
+        statusHTML = '✓ 使用预设';
+        statusClass = 'preset-configured';
+      } else {
+        // 未配置
+        statusHTML = '待配置';
+        statusClass = 'not-configured';
+      }
       
       const card = document.createElement('div');
-      card.className = 'ai-card' + (isConfigured ? ' configured' : '');
+      card.className = 'ai-card' + (userConfig || presetConfig ? ' configured' : '');
       card.dataset.aiId = siteId;
       card.dataset.tabId = tab.id;
       card.innerHTML = `
@@ -136,8 +153,8 @@ async function renderAIList() {
           <div class="ai-name">${siteName}</div>
           <div class="ai-url">${url.origin}</div>
         </div>
-        <div class="ai-status ${isConfigured ? 'configured' : 'not-configured'}">
-          ${isConfigured ? '✓ 已配置' : '待配置'}
+        <div class="ai-status ${statusClass}">
+          ${statusHTML}
         </div>
       `;
 
@@ -401,6 +418,35 @@ function showTestResult(message, type) {
   result.className = `test-result show ${type}`;
 }
 
+// 重置为预设配置
+function resetToPreset(siteId, displayName) {
+  // 检查是否有预设配置
+  if (typeof DEFAULT_CONFIGS === 'undefined' || !DEFAULT_CONFIGS[siteId]) {
+    alert('该网站没有预设配置');
+    return;
+  }
+
+  if (confirm(`确定将 ${displayName} 重置为预设配置吗？\n\n这将删除你的自定义配置。`)) {
+    // 删除用户配置，下次会自动使用预设
+    delete allConfigs[siteId];
+    saveConfigs();
+    
+    // 更新界面
+    updateConfiguredList();
+    renderAIList();
+    
+    // 显示成功提示
+    const notification = document.createElement('div');
+    notification.className = 'reset-notification';
+    notification.textContent = `✅ ${displayName} 已重置为预设配置`;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.remove();
+    }, 3000);
+  }
+}
+
 // 更新已配置列表
 function updateConfiguredList() {
   const container = document.getElementById('configuredAIs');
@@ -425,32 +471,51 @@ function updateConfiguredList() {
     };
 
     const displayName = aiNames[id] || id.replace(/_/g, '.');
+    
+    // 检查是否有预设配置
+    const hasPreset = typeof DEFAULT_CONFIGS !== 'undefined' && DEFAULT_CONFIGS[id];
+    const configSource = config.source || 'user'; // 默认认为是用户配置
 
     const item = document.createElement('div');
     item.className = 'configured-item';
     item.innerHTML = `
       <div class="configured-item-info">
-        <div class="configured-item-name">${displayName}</div>
+        <div class="configured-item-name">
+          ${displayName}
+          <span class="config-badge ${configSource}">
+            ${configSource === 'preset' ? '⚙️ 预设' : '✏️ 自定义'}
+          </span>
+        </div>
         <div class="configured-item-selectors">
           输入框: <code>${config.inputSelector}</code> | 
           发送按钮: <code>${config.sendButtonSelector}</code>
         </div>
       </div>
       <div class="configured-item-actions">
-        <button class="btn-icon" title="重新配置" data-id="${id}">✏️</button>
-        <button class="btn-icon" title="删除" data-id="${id}" data-action="delete">🗑️</button>
+        <button class="btn-icon btn-edit" title="重新配置" data-id="${id}">✏️</button>
+        ${hasPreset && configSource === 'user' ? 
+          `<button class="btn-icon btn-reset" title="重置为预设" data-id="${id}">🔄</button>` : ''}
+        <button class="btn-icon btn-delete" title="删除" data-id="${id}" data-action="delete">🗑️</button>
       </div>
     `;
 
     // 重新配置
-    item.querySelector('[title="重新配置"]').addEventListener('click', () => {
+    item.querySelector('.btn-edit').addEventListener('click', () => {
       // TODO: 实现重新配置
       alert('请在步骤1中重新选择该AI网站进行配置');
     });
 
+    // 重置为预设
+    const resetBtn = item.querySelector('.btn-reset');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        resetToPreset(id, displayName);
+      });
+    }
+
     // 删除
-    item.querySelector('[data-action="delete"]').addEventListener('click', () => {
-      if (confirm(`确定删除 ${aiNames[id]} 的配置吗？`)) {
+    item.querySelector('.btn-delete').addEventListener('click', () => {
+      if (confirm(`确定删除 ${displayName} 的配置吗？`)) {
         delete allConfigs[id];
         saveConfigs();
         updateConfiguredList();

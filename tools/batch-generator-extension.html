@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>批量配置生成器</title>
+  <style>
+    body {
+      width: 600px;
+      min-height: 400px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+    
+    h2 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    
+    .info {
+      background: #e3f2fd;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-right: 8px;
+      transition: all 0.2s;
+    }
+    
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    .progress {
+      width: 100%;
+      height: 24px;
+      background: #f0f0f0;
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 16px 0 8px 0;
+      display: none;
+    }
+    
+    .progress.active {
+      display: block;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .status {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 12px;
+      display: none;
+    }
+    
+    .status.active {
+      display: block;
+    }
+    
+    .log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 12px;
+      border-radius: 4px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin: 12px 0;
+      display: none;
+    }
+    
+    .log.active {
+      display: block;
+    }
+    
+    .result {
+      margin-top: 16px;
+      display: none;
+    }
+    
+    .result.active {
+      display: block;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .stat {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 24px;
+      font-weight: 700;
+      color: #667eea;
+      margin-bottom: 4px;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: #666;
+    }
+    
+    .code-box {
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h2>🤖 批量配置生成器</h2>
+  
+  <div class="info">
+    点击开始后会自动访问12个AI网站，检测配置并生成代码。预计需要1-2分钟。
+  </div>
+  
+  <div>
+    <button class="btn btn-primary" id="startBtn">🚀 开始批量生成</button>
+    <button class="btn btn-success" id="copyBtn" disabled>📋 复制配置代码</button>
+  </div>
+  
+  <div class="progress" id="progress">
+    <div class="progress-bar" id="progressBar">0%</div>
+  </div>
+  
+  <div class="status" id="status">准备开始...</div>
+  
+  <div class="log" id="log"></div>
+  
+  <div class="result" id="result">
+    <h3>📊 生成结果</h3>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-number" id="statTotal">0</div>
+        <div class="stat-label">总计</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number" id="statSuccess" style="color: #28a745;">0</div>
+        <div class="stat-label">成功</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number" id="statHigh" style="color: #28a745;">0</div>
+        <div class="stat-label">高信心度</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number" id="statMedium" style="color: #ffc107;">0</div>
+        <div class="stat-label">中等</div>
+      </div>
+    </div>
+    
+    <h4>生成的配置代码：</h4>
+    <div class="code-box" id="codeBox"></div>
+  </div>
+  
+  <script src="batch-config-generator.js"></script>
+  <script>
+    let currentResults = [];
+    let generatedCode = '';
+    
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      const startBtn = document.getElementById('startBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const progress = document.getElementById('progress');
+      const progressBar = document.getElementById('progressBar');
+      const status = document.getElementById('status');
+      const log = document.getElementById('log');
+      const result = document.getElementById('result');
+      
+      startBtn.disabled = true;
+      copyBtn.disabled = true;
+      progress.classList.add('active');
+      status.classList.add('active');
+      log.classList.add('active');
+      result.classList.remove('active');
+      log.textContent = '';
+      
+      function addLog(text) {
+        log.textContent += text + '\n';
+        log.scrollTop = log.scrollHeight;
+      }
+      
+      function updateProgress(current, total, text) {
+        const percent = Math.round((current / total) * 100);
+        progressBar.style.width = percent + '%';
+        progressBar.textContent = percent + '%';
+        status.textContent = text;
+      }
+      
+      try {
+        addLog('🚀 开始批量生成配置...\n');
+        
+        const results = [];
+        const errors = [];
+        const total = AI_SITES.length;
+        
+        for (let i = 0; i < total; i++) {
+          const site = AI_SITES[i];
+          updateProgress(i, total, `[${i + 1}/${total}] 正在处理: ${site.name}`);
+          addLog(`[${i + 1}/${total}] 正在处理: ${site.name} (${site.url})`);
+          
+          try {
+            const result = await processOneSite(site);
+            results.push(result);
+            
+            const inputIcon = result.confidence.input >= 80 ? '🟢' : result.confidence.input >= 50 ? '🟡' : '🔴';
+            const buttonIcon = result.confidence.sendButton >= 80 ? '🟢' : result.confidence.sendButton >= 50 ? '🟡' : '🔴';
+            addLog(`  ✅ 完成 - 信心度: 输入框${inputIcon} 按钮${buttonIcon}\n`);
+          } catch (error) {
+            errors.push({ site: site.name, error: error.message });
+            addLog(`  ❌ 失败: ${error.message}\n`);
+          }
+          
+          await sleep(500);
+        }
+        
+        updateProgress(total, total, '全部完成！');
+        
+        // 生成统计
+        const success = results.length;
+        const high = results.filter(r => r.confidence.input >= 80 && r.confidence.sendButton >= 80).length;
+        const medium = results.filter(r => 
+          (r.confidence.input >= 50 && r.confidence.input < 80) ||
+          (r.confidence.sendButton >= 50 && r.confidence.sendButton < 80)
+        ).length;
+        
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statSuccess').textContent = success;
+        document.getElementById('statHigh').textContent = high;
+        document.getElementById('statMedium').textContent = medium;
+        
+        // 生成配置代码
+        let code = 'const DEFAULT_CONFIGS = {\n';
+        results.forEach((r, index) => {
+          if (r.inputSelector && r.sendButtonSelector) {
+            const siteName = r.siteName.split(' - ')[0].split(' | ')[0];
+            code += `  // ${siteName}\n`;
+            code += `  '${r.siteId}': {\n`;
+            code += `    name: '${siteName}',\n`;
+            code += `    inputSelector: '${r.inputSelector}',\n`;
+            code += `    sendButtonSelector: '${r.sendButtonSelector}',\n`;
+            code += `    version: '${r.version}',\n`;
+            code += `    notes: '自动生成 - 输入框:${r.confidence.input} 按钮:${r.confidence.sendButton}'\n`;
+            code += `  }${index < results.length - 1 ? ',' : ''}\n\n`;
+          }
+        });
+        code += '};\n';
+        
+        generatedCode = code;
+        document.getElementById('codeBox').textContent = code;
+        
+        result.classList.add('active');
+        copyBtn.disabled = false;
+        
+        addLog('\n✅ 批量生成完成！');
+        addLog(`\n📊 统计：成功 ${success}/${total}, 高信心度 ${high} 个`);
+        
+      } catch (error) {
+        addLog(`\n❌ 发生错误: ${error.message}`);
+        alert('生成失败：' + error.message);
+      } finally {
+        startBtn.disabled = false;
+      }
+    });
+    
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(generatedCode).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✅ 已复制';
+        setTimeout(() => {
+          btn.textContent = '📋 复制配置代码';
+        }, 2000);
+      });
+    });
+    
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+  </script>
+</body>
+</html>
+
