@@ -356,6 +356,11 @@ body {
   min-width: 140px;
 }
 
+/* 回车开关内联label样式优化 */
+#preferEnterToggle {
+  margin-right: 8px;
+}
+
 .config-item code {
   background: #f8f9fa;
   padding: 6px 12px;
@@ -641,5 +646,96 @@ body {
   to {
     opacity: 0;
   }
+}
+
+/* 发送策略展示样式 */
+.send-strategy-info {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f0f7ff;
+  border-left: 3px solid #2196f3;
+  border-radius: 4px;
+}
+
+.strategy-title {
+  font-weight: 600;
+  color: #1976d2;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.strategy-content {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.6;
+}
+
+/* 配置列表中的选择器行 */
+.selector-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.selector-label {
+  font-weight: 500;
+  min-width: 70px;
+  color: #666;
+}
+
+/* 发送策略徽章 */
+.send-strategy {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #ddd;
+}
+
+.strategy-badge {
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.strategy-enter .strategy-badge {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.strategy-button .strategy-badge {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.strategy-auto .strategy-badge {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+/* 提示文本 */
+.hint-small {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* 优化已配置项的选择器显示 */
+.configured-item-selectors code {
+  font-size: 11px;
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #e0e0e0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 400px;
+  display: inline-block;
 }
 

@@ -15,7 +15,7 @@ Qwen 网站检测到了以下异常行为：
 3. **时间间隔过短** - 填充输入框和点击发送按钮之间只间隔500ms，太快了
 4. **重复发送** - 可能在短时间内多次触发同一个发送操作
 
-## 解决方案
+## 解决方案（最终版 v1.2.0）
 
 ### 1. 减少不必要的事件触发 ✅
 
@@ -52,44 +52,59 @@ sendButton.dispatchEvent(new MouseEvent('click', mouseEventOptions));
 sendButton.click();
 ```
 
-### 2. 增加操作延迟 ✅
+### 2. 就绪等待 + 最小间隔（Qwen 专用） ✅
 
-**填充和发送之间的延迟**:
+在 `iframe-injector.js` 中对包含 "qwen" 的域名启用：
+
 ```javascript
-// 之前: 500ms
-setTimeout(() => {
-  clickSendButton();
-}, 500);
-
-// 现在: 1000ms (1秒)
-setTimeout(() => {
-  clickSendButton();
-}, 1000);
+// Qwen: 最小间隔2s + 就绪等待（最多2s）
+const minInterval = hostname.includes('qwen') ? 2000 : MIN_SEND_INTERVAL;
+const timeoutMs = hostname.includes('qwen') ? 2000 : 600;
+await waitUntilReadyForSend(inputElement, text, timeoutMs);
 ```
 
-### 3. 添加防重复发送机制 ✅
+含义：仅当输入框内容稳定且“附近可点击的发送按钮”存在时才触发发送；并且两次发送至少相隔2秒。
+
+### 3. 发送互斥锁 + 仅用回车发送（Qwen 专用） ✅
 
 **位置**: `content-scripts/iframe-injector.js`
 
 ```javascript
 // 防重复发送机制
 let lastSendTime = 0;
-const MIN_SEND_INTERVAL = 2000; // 最小发送间隔2秒
+const MIN_SEND_INTERVAL = 800; // 通用值，Qwen 用2s覆盖
+let qwenSendingInFlight = false; // 互斥锁
 
 function fillAndSendMessage(text) {
   // 检查是否在最小间隔内
   const now = Date.now();
-  if (now - lastSendTime < MIN_SEND_INTERVAL) {
+const minInterval = hostname.includes('qwen') ? 2000 : MIN_SEND_INTERVAL;
+if (now - lastSendTime < minInterval) {
     console.warn('⚠️ 发送过于频繁，已跳过。距上次发送仅', now - lastSendTime, 'ms');
     return;
   }
+if (hostname.includes('qwen') && qwenSendingInFlight) {
+  console.warn('⚠️ Qwen: 上一次发送仍在进行中，跳过本次触发');
+  return;
+}
+qwenSendingInFlight = true;
+triggerEnterKey(inputElement, text);
+setTimeout(() => { qwenSendingInFlight = false; }, 2500);
   lastSendTime = now;
   
   // ... 继续执行
 }
 ```
 
-### 4. iframe之间的延迟发送 ✅
+### 4. 附近按钮优先 + 过滤无关按钮（避免点到“新建/登录”） ✅
+
+优先从输入框向上查找最近的可用按钮，并过滤包含“新建/登录/清空/删除/返回/下载”等关键词的按钮文本/aria-label，避免误点导致新建会话或跳转。
+
+### 5. 中文输入法合成提交（compositionend） ✅
+
+在回车前触发 `compositionend` 和一次 `input`，确保中文输入法合成文本提交，避免 chat_id 等状态未就绪。
+
+### 6. iframe之间的延迟发送（如需） ✅
 
 **位置**: `split-view/split-view.js`
 
@@ -205,6 +220,7 @@ for (let index = 0; index < iframes.length; index++) {
 这些改动应该能解决 Qwen 的 "chat is in progress" 错误。
 
 ---
-**更新时间**: 2025-10-19  
-**版本**: v1.1.0
+**更新时间**: 2025-10-21  
+**版本**: v1.2.0
+
 

@@ -383,7 +383,7 @@ async function sendToAllAI() {
   let successCount = 0;
   const iframes = document.querySelectorAll('.iframe-container iframe');
   
-  // 方法1: 尝试通过postMessage发送到iframe
+  // 方法1: 尝试通过postMessage发送到iframe（同时发送，最佳用户体验）
   console.log('📤 准备向', iframes.length, '个iframe发送消息');
   iframes.forEach((iframe, index) => {
     try {

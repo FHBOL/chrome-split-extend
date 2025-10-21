@@ -3,13 +3,13 @@
 
 const DEFAULT_CONFIGS = {
   // DeepSeek - 探索未至之境
-'chat_deepseek_com': {
-   name: 'DeepSeek',
-   inputSelector: 'textarea',
-   sendButtonSelector: '.ds-atom-button[role="button"]:not(.undefined)',
-  version: '2025-10-19',
-   notes: '稳定配置'
- },
+  'chat_deepseek_com': {
+    name: 'DeepSeek',
+    inputSelector: 'textarea',
+    // 不配置sendButtonSelector，使用Enter键发送（DeepSeek支持回车发送）
+    version: '2025-10-20',
+    notes: '使用Enter键发送，通用且稳定'
+  },
 
   // ChatGPT
   'chatgpt_com': {

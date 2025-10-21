@@ -70,8 +70,9 @@
         <div class="instruction-step">
           <div class="step-badge">步骤 3</div>
           <div class="step-content-text">
-            <h4>点击"选择发送按钮"</h4>
+            <h4>点击"选择发送按钮"（可选）</h4>
             <p>移动到<strong>发送按钮</strong>上点击</p>
+            <p class="hint-small">💡 如果不选择，将使用Enter键发送（推荐）</p>
           </div>
         </div>
 
@@ -96,6 +97,14 @@
         </div>
         <div class="config-status" id="configStatus">
           ⏳ 等待配置...
+        </div>
+        
+        <!-- 发送策略说明 -->
+        <div class="send-strategy-info" id="sendStrategyInfo" style="display: none;">
+          <div class="strategy-title">📌 发送方式：</div>
+          <div class="strategy-content" id="strategyContent">
+            <!-- 动态生成 -->
+          </div>
         </div>
       </div>
 

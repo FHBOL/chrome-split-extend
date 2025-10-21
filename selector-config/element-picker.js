@@ -5,6 +5,7 @@
   let highlightedElement = null;
   let siteId = '';
   let siteName = '';
+  let preferEnter = true;
 
   // 创建控制面板
   function createControlPanel() {
@@ -34,6 +35,15 @@
           <div class="selected-info" id="send-info">未选择</div>
         </div>
         <div class="panel-step">
+          <div class="step-label">发送方式</div>
+          <label class="prefer-enter-row">
+            <input id="prefer-enter-toggle" type="checkbox" checked /> 使用回车键作为发送方式（推荐）
+          </label>
+          <div class="helper-text">
+            <small>不开启时将使用上面选择的发送按钮；若按钮不可用会自动降级回车</small>
+          </div>
+        </div>
+        <div class="panel-step">
           <button id="save-config" class="panel-btn panel-btn-primary" disabled>
             💾 保存配置
           </button>
@@ -51,6 +61,20 @@
     document.getElementById('pick-input').addEventListener('click', startPickingInput);
     document.getElementById('pick-send').addEventListener('click', startPickingSend);
     document.getElementById('save-config').addEventListener('click', saveConfig);
+    const preferToggle = document.getElementById('prefer-enter-toggle');
+    if (preferToggle) {
+      preferToggle.checked = !!preferEnter;
+      preferToggle.addEventListener('change', (e) => {
+        preferEnter = !!e.target.checked;
+        try {
+          chrome.runtime.sendMessage({
+            action: 'preferEnterChanged',
+            siteId,
+            value: preferEnter
+          });
+        } catch (err) {}
+      });
+    }
     
     // 启用拖拽
     makeDraggable(panel);
@@ -615,22 +639,50 @@
         inputElement.dispatchEvent(new Event('input', { bubbles: true }));
       }
 
+      // 判断是否使用回车偏好
+      const preferEnter = config && config.preferEnter !== false; // 默认true
+      if (preferEnter || !config.sendButtonSelector) {
+        // 触发Enter键发送
+        triggerEnterKey(inputElement);
+        alert('✅ 已尝试回车发送，请查看页面是否成功');
+        return;
+      }
+
       // 查找发送按钮
       const sendButton = document.querySelector(config.sendButtonSelector);
       if (!sendButton) {
-        alert('未找到发送按钮，选择器可能不正确');
+        // 无按钮则降级回车
+        triggerEnterKey(inputElement);
+        alert('⚠️ 未找到按钮，已尝试回车发送');
         return;
       }
 
       // 点击发送
       setTimeout(() => {
+        try { sendButton.focus && sendButton.focus(); } catch (e) {}
+        sendButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        sendButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        sendButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         sendButton.click();
         alert('✅ 测试成功！消息已发送');
-      }, 500);
+      }, 300);
 
     } catch (error) {
       alert('❌ 测试失败: ' + error.message);
     }
+  }
+
+  // 触发Enter键
+  function triggerEnterKey(element) {
+    try { element.focus(); } catch (e) {}
+    try { element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })); } catch (e) {}
+    element.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    const kd = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true });
+    const kp = new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true });
+    const ku = new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true });
+    element.dispatchEvent(kd);
+    element.dispatchEvent(kp);
+    element.dispatchEvent(ku);
   }
 
   // 阻止mousedown和mouseup事件（防止误触发按钮）
@@ -650,7 +702,25 @@
 
   // 初始化
   function init() {
-    createControlPanel();
+    // 先读取已存在的配置以初始化开关
+    try {
+      chrome.storage.local.get(['aiSelectorConfigs'], (result) => {
+        try {
+          const configs = result && result.aiSelectorConfigs ? result.aiSelectorConfigs : {};
+          const cfg = configs[siteId];
+          preferEnter = cfg && typeof cfg.preferEnter !== 'undefined' ? !!cfg.preferEnter : true;
+        } catch (e) {
+          preferEnter = true;
+        }
+        createControlPanel();
+        // 同步一次状态到配置页，确保被持久化
+        try {
+          chrome.runtime.sendMessage({ action: 'preferEnterChanged', siteId, value: preferEnter });
+        } catch (err) {}
+      });
+    } catch (e) {
+      createControlPanel();
+    }
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown, true);
     document.addEventListener('mouseup', handleMouseUp, true);

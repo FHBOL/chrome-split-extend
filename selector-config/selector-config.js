@@ -3,7 +3,8 @@ let currentStep = 1;
 let selectedSite = null;
 let currentConfig = {
   inputSelector: '',
-  sendButtonSelector: ''
+  sendButtonSelector: '',
+  preferEnter: true
 };
 let allConfigs = {};
 
@@ -250,6 +251,8 @@ function bindEvents() {
     goToStep(3);
   });
 
+  // （开关已移动至元素选择面板，通过runtime消息同步，这里无需再绑定）
+
   // 测试发送
   document.getElementById('testSend').addEventListener('click', testSend);
 
@@ -270,6 +273,12 @@ function bindEvents() {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'selectorSelected') {
       handleSelectorSelected(request.type, request.selector);
+    } else if (request.action === 'preferEnterChanged' && selectedSite && request.siteId === selectedSite.id) {
+      currentConfig.preferEnter = !!request.value;
+      allConfigs[selectedSite.id] = { ...currentConfig };
+      saveConfigs();
+      updatePreview();
+      updateConfiguredList();
     }
   });
 }
@@ -301,10 +310,10 @@ function updateCurrentSiteInfo() {
 
   // 如果已有配置，显示
   if (allConfigs[selectedSite.id]) {
-    currentConfig = { ...allConfigs[selectedSite.id] };
+    currentConfig = { preferEnter: true, ...allConfigs[selectedSite.id] };
     updatePreview();
   } else {
-    currentConfig = { inputSelector: '', sendButtonSelector: '' };
+    currentConfig = { inputSelector: '', sendButtonSelector: '', preferEnter: true };
     document.getElementById('previewInput').textContent = '未选择';
     document.getElementById('previewSend').textContent = '未选择';
   }
@@ -361,10 +370,54 @@ function handleSelectorSelected(type, selector) {
 function updatePreview() {
   const status = document.getElementById('configStatus');
   const nextBtn = document.getElementById('nextToStep3');
+  const strategyInfo = document.getElementById('sendStrategyInfo');
+  const strategyContent = document.getElementById('strategyContent');
+  const hasInput = currentConfig.inputSelector && currentConfig.inputSelector !== '';
+  const hasSendButton = currentConfig.sendButtonSelector && currentConfig.sendButtonSelector !== '';
+  
 
-  if (currentConfig.inputSelector && currentConfig.sendButtonSelector) {
+  // 更新发送策略说明
+  if (hasInput || hasSendButton) {
+    strategyInfo.style.display = 'block';
+    
+    if (currentConfig.preferEnter) {
+      strategyContent.innerHTML = `
+        <strong>⌨️ 使用Enter键发送（推荐）</strong><br>
+        你启用了“回车发送”偏好设置。<br>
+        <span style="color: #2e7d32;">✓ 更通用、更稳定；若站点不支持，将自动尝试按钮</span>
+      `;
+    } else if (hasInput && !hasSendButton) {
+      // 只配置了输入框
+      strategyContent.innerHTML = `
+        <strong>⌨️ 使用Enter键发送（推荐）</strong><br>
+        你只配置了输入框，发送将使用最通用的Enter键方式。<br>
+        <span style="color: #2e7d32;">✓ 适用于几乎所有AI网站，无需额外配置</span>
+      `;
+    } else if (hasSendButton) {
+      // 配置了发送按钮
+      strategyContent.innerHTML = `
+        <strong>🖱️ 点击发送按钮</strong><br>
+        将使用你配置的发送按钮进行发送。<br>
+        <span style="color: #ef6c00;">⚠ 如果按钮不可用，会自动降级使用Enter键</span>
+      `;
+    }
+  } else {
+    strategyInfo.style.display = 'none';
+  }
+
+  // 更新状态和按钮
+  if (hasInput && hasSendButton) {
     status.className = 'config-status success';
-    status.textContent = '✅ 配置完成！可以进入下一步测试';
+    status.textContent = '✅ 完整配置完成！可以进入下一步测试';
+    nextBtn.disabled = false;
+
+    // 保存配置
+    allConfigs[selectedSite.id] = { ...currentConfig };
+    saveConfigs();
+    updateConfiguredList();
+  } else if (hasInput) {
+    status.className = 'config-status success';
+    status.textContent = '✅ 输入框已配置，将使用Enter键发送（推荐）';
     nextBtn.disabled = false;
 
     // 保存配置
@@ -405,7 +458,7 @@ async function testSend() {
       config: currentConfig
     });
 
-    showTestResult('✅ 测试成功！请检查AI网站是否收到消息', 'success');
+    showTestResult('✅ 已触发测试，请在AI网页确认是否发送成功', 'success');
   } catch (error) {
     showTestResult('❌ 测试失败: ' + error.message, 'error');
   }
@@ -476,6 +529,28 @@ function updateConfiguredList() {
     const hasPreset = typeof DEFAULT_CONFIGS !== 'undefined' && DEFAULT_CONFIGS[id];
     const configSource = config.source || 'user'; // 默认认为是用户配置
 
+    // 确定发送策略
+    const hasInputConfig = config.inputSelector && config.inputSelector !== '';
+    const hasSendButtonConfig = config.sendButtonSelector && config.sendButtonSelector !== '';
+    const preferEnter = config.preferEnter !== false; // 默认true
+    
+    let sendStrategy = '';
+    let strategyClass = '';
+    
+    if (preferEnter) {
+      sendStrategy = '⌨️ Enter键发送（偏好）';
+      strategyClass = 'strategy-enter';
+    } else if (hasInputConfig && !hasSendButtonConfig) {
+      sendStrategy = '⌨️ Enter键发送（推荐）';
+      strategyClass = 'strategy-enter';
+    } else if (hasSendButtonConfig) {
+      sendStrategy = '🖱️ 点击发送按钮';
+      strategyClass = 'strategy-button';
+    } else {
+      sendStrategy = '🔍 自动查找 → Enter键';
+      strategyClass = 'strategy-auto';
+    }
+
     const item = document.createElement('div');
     item.className = 'configured-item';
     item.innerHTML = `
@@ -487,8 +562,18 @@ function updateConfiguredList() {
           </span>
         </div>
         <div class="configured-item-selectors">
-          输入框: <code>${config.inputSelector}</code> | 
-          发送按钮: <code>${config.sendButtonSelector}</code>
+          <div class="selector-row">
+            <span class="selector-label">输入框:</span>
+            <code>${config.inputSelector || '未配置'}</code>
+          </div>
+          <div class="selector-row">
+            <span class="selector-label">发送按钮:</span>
+            <code>${config.sendButtonSelector || '未配置'}</code>
+          </div>
+          <div class="selector-row send-strategy ${strategyClass}">
+            <span class="selector-label">发送方式:</span>
+            <span class="strategy-badge">${sendStrategy}</span>
+          </div>
         </div>
       </div>
       <div class="configured-item-actions">
