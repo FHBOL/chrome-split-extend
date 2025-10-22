@@ -326,14 +326,21 @@ function bindEvents() {
   // 发送按钮
   document.getElementById('sendButton').addEventListener('click', sendToAllAI);
   
-  // 输入框快捷键
-  document.getElementById('unifiedInput').addEventListener('keydown', (e) => {
-    // Enter发送，Ctrl+Enter换行
+  // 输入框组合输入追踪 + 快捷键
+  const unifiedInput = document.getElementById('unifiedInput');
+  let isImeComposing = false;
+  unifiedInput.addEventListener('compositionstart', () => { isImeComposing = true; });
+  unifiedInput.addEventListener('compositionend', () => { isImeComposing = false; });
+  unifiedInput.addEventListener('keydown', (e) => {
+    // 组合输入期的Enter不发送（避免中文输入法候选期误发）
+    if (e.isComposing || isImeComposing || e.keyCode === 229) {
+      return;
+    }
+    // Enter发送，Ctrl+Enter或Shift+Enter换行（默认行为）
     if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
       e.preventDefault();
       sendToAllAI();
     }
-    // Ctrl+Enter或Shift+Enter换行（默认行为）
   });
   
   // 布局选择器
